@@ -8,7 +8,12 @@ import {
   signUpWithEmail,
   type AuthCredentials,
 } from '../services/auth/authService';
-import { generateMockCourse, type GeneratedCourse } from '../services/course/mockCourseService';
+import {
+  generateMockCourse,
+  getLatestCourseForLearner,
+  saveGeneratedCourse,
+  type GeneratedCourse,
+} from '../services/course/mockCourseService';
 import { getLearnerProfile, saveLearnerProfile } from '../services/profile/profileService';
 import { getRuntimeProviders } from '../services/providerRegistry';
 import type { LanguageCode, LearnerProfile, LearningGoal, LearningLanguage, ProviderPlan } from '../types/learning';
@@ -20,8 +25,10 @@ type VaanikaState = {
   assessmentScore: number;
   authError: string | null;
   authMode: 'mock' | 'supabase';
+  authNotice: string | null;
   authStatus: 'loading' | 'signed_in' | 'signed_out';
   courseProgress: `${number}%`;
+  dataStatus: 'idle' | 'loading' | 'ready' | 'error';
   language: LearningLanguage;
   learnerProfile: LearnerProfile | null;
   learnerNeed: string;
@@ -35,9 +42,9 @@ type VaanikaState = {
   completeAssessment: () => void;
   completeLesson: () => void;
   generateCourse: () => Promise<void>;
-  signIn: (credentials: AuthCredentials) => Promise<void>;
+  signIn: (credentials: AuthCredentials) => Promise<boolean>;
   signOutUser: () => Promise<void>;
-  signUp: (credentials: AuthCredentials) => Promise<void>;
+  signUp: (credentials: AuthCredentials) => Promise<boolean>;
   setLearnerNeed: (need: string) => void;
   setSelectedGoal: (goal: LearningGoal) => void;
   setSelectedLanguage: (language: LanguageCode) => void;
@@ -57,7 +64,9 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
   const [authStatus, setAuthStatus] = useState<VaanikaState['authStatus']>('loading');
   const [authMode, setAuthMode] = useState<VaanikaState['authMode']>('mock');
   const [authError, setAuthError] = useState<string | null>(null);
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [learnerProfile, setLearnerProfile] = useState<LearnerProfile | null>(null);
+  const [dataStatus, setDataStatus] = useState<VaanikaState['dataStatus']>('idle');
 
   const language = LANGUAGES.find((item) => item.code === selectedLanguage) ?? LANGUAGES[0];
   const providerPlan = useMemo(() => getProviderPlan(selectedLanguage), [selectedLanguage]);
@@ -77,14 +86,8 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
         setUserId(authState.userId);
         setAuthStatus(authState.userId ? 'signed_in' : 'signed_out');
 
-        if (authState.userId) {
-          const profile = await getLearnerProfile(authState.userId);
-
-          if (profile && isMounted) {
-            setLearnerProfile(profile);
-            setSelectedGoal(profile.goal);
-            setSelectedLanguage(profile.targetLanguage);
-          }
+        if (authState.userId && isMounted) {
+          await hydrateLearnerState(authState.userId, isMounted);
         }
       })
       .catch((error: unknown) => {
@@ -106,8 +109,10 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
       assessmentScore,
       authError,
       authMode,
+      authNotice,
       authStatus,
       courseProgress,
+      dataStatus,
       language,
       learnerProfile,
       learnerNeed,
@@ -121,6 +126,7 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
       completeAssessment: () => setAssessmentScore(selectedLanguage === 'ta-IN' ? 84 : 88),
       completeLesson: () => setLessonStatus('complete'),
       generateCourse: async () => {
+        setDataStatus('loading');
         const profile = await saveLearnerProfile({
           id: userId ?? 'mock-learner',
           displayName: 'Vaanika Learner',
@@ -133,25 +139,35 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
           goal: profile.goal,
           targetLanguage: profile.targetLanguage,
         });
+        const savedCourse = await saveGeneratedCourse(profile, generatedCourse);
 
         setLearnerProfile(profile);
-        setMockCourse(generatedCourse);
+        setMockCourse(savedCourse);
         setLessonStatus('not_started');
         setAssessmentScore(0);
+        setDataStatus('ready');
       },
       signIn: async (credentials) => {
         setAuthError(null);
         const authState = await signInWithEmail(credentials);
 
         setAuthMode(authState.isConfigured ? 'supabase' : 'mock');
+        setAuthNotice(null);
         setUserId(authState.userId);
         setAuthStatus(authState.userId ? 'signed_in' : 'signed_out');
+
+        if (authState.userId) {
+          await hydrateLearnerState(authState.userId, true);
+        }
+
+        return Boolean(authState.userId);
       },
       signOutUser: async () => {
         const authState = await signOut();
 
         setUserId(authState.userId);
         setAuthStatus('signed_out');
+        setDataStatus('idle');
         setLearnerProfile(null);
         setMockCourse(null);
       },
@@ -160,8 +176,15 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
         const authState = await signUpWithEmail(credentials);
 
         setAuthMode(authState.isConfigured ? 'supabase' : 'mock');
+        setAuthNotice(authState.needsEmailConfirmation ? 'Check your email to confirm the account before saving progress.' : null);
         setUserId(authState.userId);
         setAuthStatus(authState.userId ? 'signed_in' : 'signed_out');
+
+        if (authState.userId) {
+          await hydrateLearnerState(authState.userId, true);
+        }
+
+        return Boolean(authState.userId);
       },
       setLearnerNeed,
       setSelectedGoal,
@@ -172,8 +195,10 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
       assessmentScore,
       authError,
       authMode,
+      authNotice,
       authStatus,
       courseProgress,
+      dataStatus,
       language,
       learnerProfile,
       learnerNeed,
@@ -188,6 +213,40 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
   );
 
   return <VaanikaContext.Provider value={value}>{children}</VaanikaContext.Provider>;
+
+  async function hydrateLearnerState(nextUserId: string, isMounted: boolean) {
+    setDataStatus('loading');
+
+    try {
+      const [profile, latestCourse] = await Promise.all([
+        getLearnerProfile(nextUserId),
+        getLatestCourseForLearner(nextUserId),
+      ]);
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (profile) {
+        setLearnerProfile(profile);
+        setSelectedGoal(profile.goal);
+        setSelectedLanguage(profile.targetLanguage);
+      }
+
+      if (latestCourse) {
+        setMockCourse(latestCourse);
+      }
+
+      setDataStatus('ready');
+    } catch (error) {
+      if (!isMounted) {
+        return;
+      }
+
+      setAuthError(getErrorMessage(error));
+      setDataStatus('error');
+    }
+  }
 }
 
 function getErrorMessage(error: unknown): string {

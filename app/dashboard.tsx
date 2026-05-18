@@ -8,6 +8,7 @@ export default function DashboardRoute() {
   const router = useRouter();
   const {
     courseProgress,
+    dataStatus,
     language,
     learnerNeed,
     mockCourse,
@@ -26,6 +27,7 @@ export default function DashboardRoute() {
         <Text style={styles.summaryTitle}>{selectedGoal} practice</Text>
         <Text style={styles.summaryCopy}>{learnerNeed}</Text>
         <Text style={styles.authStatus}>Learner: {userId ?? 'not signed in'}</Text>
+        <Text style={styles.authStatus}>Data: {dataStatus}</Text>
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: courseProgress }]} />
         </View>

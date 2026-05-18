@@ -2,6 +2,7 @@ import { isSupabaseConfigured, supabase } from '../../backend/supabaseClient';
 
 export type AuthSessionState = {
   isConfigured: boolean;
+  needsEmailConfirmation?: boolean;
   userId: string | null;
 };
 
@@ -62,7 +63,8 @@ export async function signUpWithEmail({ email, password }: AuthCredentials): Pro
 
   return {
     isConfigured: true,
-    userId: data.user?.id ?? null,
+    needsEmailConfirmation: !data.session,
+    userId: data.session?.user.id ?? null,
   };
 }
 

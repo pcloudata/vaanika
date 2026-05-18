@@ -21,6 +21,24 @@ npm run android
 
 Expo web dependencies are installed for future preview work, but the product target is the mobile app.
 
+## Supabase Setup
+
+The initial schema is in `supabase/migrations/20260517162000_initial_schema.sql`.
+
+Apply it with one of these paths:
+
+1. Link the repo with the Supabase CLI, then run `supabase db push`.
+2. Paste the migration SQL into the Supabase SQL editor and run it once.
+
+The app reads these public mobile env vars:
+
+```sh
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_ANON_KEY=
+```
+
+RLS is enabled for all learner-owned tables. Learner rows are scoped to `auth.uid()`.
+
 ## Current Implementation
 
 - `src/screens/MobilePrototypeScreen.tsx` contains the mobile prototype flow.

@@ -1,26 +1,36 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { useVaanika } from '../src/state/VaanikaContext';
 import { PrimaryButton, ScreenShell, SecondaryButton, styles } from '../src/ui/VaanikaUI';
 
+type AuthFormMode = 'sign_in' | 'sign_up';
+
 export default function AuthRoute() {
   const router = useRouter();
-  const { authError, authMode, authStatus, signIn, signUp } = useVaanika();
-  const [email, setEmail] = useState('learner@vaanika.app');
-  const [password, setPassword] = useState('password123');
+  const { authError, authMode, authNotice, authStatus, signIn, signUp } = useVaanika();
+  const [formMode, setFormMode] = useState<AuthFormMode>('sign_in');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const submit = async (mode: 'sign_in' | 'sign_up') => {
+  const submit = async () => {
     setIsSubmitting(true);
     setLocalError(null);
 
     try {
-      if (mode === 'sign_in') {
-        await signIn({ email, password });
-      } else {
-        await signUp({ email, password });
+      if (!email.trim() || password.length < 6) {
+        setLocalError('Enter a valid email and a password with at least 6 characters.');
+        return;
+      }
+
+      const isSignedIn =
+        formMode === 'sign_in' ? await signIn({ email, password }) : await signUp({ email, password });
+
+      if (!isSignedIn) {
+        return;
       }
 
       router.replace('/onboarding');
@@ -39,7 +49,27 @@ export default function AuthRoute() {
         <Text style={styles.summaryCopy}>
           Use an account to persist language choice, generated courses, lesson progress, and skill badges.
         </Text>
+        <Text style={styles.summaryCopy}>
+          Learner profile and course rows are saved after onboarding, once the app knows your language and goal.
+        </Text>
         <Text style={styles.authStatus}>Status: {authStatus.replace('_', ' ')}</Text>
+      </View>
+
+      <View style={styles.segmentGroup}>
+        {(['sign_in', 'sign_up'] as const).map((mode) => (
+          <Pressable
+            key={mode}
+            onPress={() => {
+              setFormMode(mode);
+              setLocalError(null);
+            }}
+            style={[styles.segment, formMode === mode && styles.segmentActive]}
+          >
+            <Text style={[styles.segmentText, formMode === mode && styles.segmentTextActive]}>
+              {mode === 'sign_in' ? 'Sign in' : 'Create account'}
+            </Text>
+          </Pressable>
+        ))}
       </View>
 
       <View style={styles.section}>
@@ -57,29 +87,40 @@ export default function AuthRoute() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Password</Text>
-        <TextInput
-          onChangeText={setPassword}
-          placeholder="Minimum 6 characters"
-          placeholderTextColor="#7b857f"
-          secureTextEntry
-          style={styles.textInput}
-          value={password}
-        />
+        <View style={styles.passwordField}>
+          <TextInput
+            onChangeText={setPassword}
+            placeholder="Minimum 6 characters"
+            placeholderTextColor="#7b857f"
+            secureTextEntry={!isPasswordVisible}
+            style={styles.passwordInput}
+            value={password}
+          />
+          <Pressable
+            accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+            onPress={() => setIsPasswordVisible((current) => !current)}
+            style={styles.passwordToggle}
+          >
+            <Text style={styles.passwordToggleText}>{isPasswordVisible ? '◉' : '◎'}</Text>
+          </Pressable>
+        </View>
       </View>
 
+      {authNotice && <Text style={styles.noticeText}>{authNotice}</Text>}
       {(localError || authError) && <Text style={styles.errorText}>{localError ?? authError}</Text>}
 
       <View style={styles.actionRow}>
         <PrimaryButton
-          label={isSubmitting ? 'Signing in...' : 'Sign in'}
+          label={isSubmitting ? 'Working...' : formMode === 'sign_in' ? 'Sign in' : 'Create account'}
           onPress={() => {
-            void submit('sign_in');
+            void submit();
           }}
         />
         <SecondaryButton
-          label={isSubmitting ? 'Creating...' : 'Create account'}
+          label={formMode === 'sign_in' ? 'Need an account?' : 'Already have one?'}
           onPress={() => {
-            void submit('sign_up');
+            setFormMode(formMode === 'sign_in' ? 'sign_up' : 'sign_in');
+            setLocalError(null);
           }}
         />
       </View>
