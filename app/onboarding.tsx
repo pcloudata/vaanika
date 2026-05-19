@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { LANGUAGES, LEARNER_GOALS } from '../src/data/learning';
 import { useVaanika } from '../src/state/VaanikaContext';
@@ -6,8 +7,14 @@ import { PrimaryButton, ScreenShell, styles } from '../src/ui/VaanikaUI';
 
 export default function OnboardingRoute() {
   const router = useRouter();
-  const { generateCourse, learnerNeed, selectedGoal, selectedLanguage, setLearnerNeed, setSelectedGoal, setSelectedLanguage } =
+  const { authStatus, generateCourse, learnerNeed, selectedGoal, selectedLanguage, setLearnerNeed, setSelectedGoal, setSelectedLanguage, userId } =
     useVaanika();
+
+  useEffect(() => {
+    if (authStatus === 'signed_out' || !userId) {
+      router.replace('/auth');
+    }
+  }, [authStatus, router, userId]);
 
   return (
     <ScreenShell homeHref="/dashboard">

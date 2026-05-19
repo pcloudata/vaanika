@@ -8,9 +8,7 @@ const SARVAM_BASE_URL = process.env.EXPO_PUBLIC_SARVAM_BASE_URL ?? 'https://api.
 const SARVAM_TIMEOUT_MS = 12000;
 
 export async function prepareVoiceRuntime() {
-  console.log('[voice] prepareVoiceRuntime: requesting microphone permission');
   const permission = await requestRecordingPermissionsAsync();
-  console.log('[voice] prepareVoiceRuntime: permission status', permission.status);
   if (!permission.granted) {
     throw new Error('Microphone permission is required for voice interruptions.');
   }
@@ -23,7 +21,6 @@ export async function prepareVoiceRuntime() {
 }
 
 export async function speakTutorLine(text: string, languageCode: LanguageCode, providerName?: VoiceProviderName) {
-  console.log('[voice] speakTutorLine: start', { languageCode, providerName, preview: text.slice(0, 80) });
   await stopTutorSpeech(providerName);
 
   try {
@@ -33,14 +30,11 @@ export async function speakTutorLine(text: string, languageCode: LanguageCode, p
     }
     await speakWithOptions(text, languageCode);
   } catch (error) {
-    console.log('[voice] speakTutorLine: primary language speak failed, retrying default voice');
     await speakWithOptions(text);
-    console.log('[voice] speakTutorLine: fallback voice completed after primary failure', getErrorMessage(error));
   }
 }
 
 export async function stopTutorSpeech(_providerName?: VoiceProviderName) {
-  console.log('[voice] stopTutorSpeech: stopping speech');
   Speech.stop();
 }
 
@@ -49,8 +43,6 @@ export async function transcribeRecordedAudio(
   languageCode: LanguageCode,
   providerName?: VoiceProviderName,
 ): Promise<string> {
-  console.log('[voice] stopRecordingAndTranscribe: uri available', Boolean(uri));
-
   if (!uri) {
     throw new Error('No audio captured.');
   }
@@ -59,18 +51,15 @@ export async function transcribeRecordedAudio(
     try {
       const sarvamTranscript = await transcribeWithSarvam(uri);
       if (sarvamTranscript) {
-        console.log('[voice] stopRecordingAndTranscribe: used sarvam transcript');
         return sarvamTranscript;
       }
     } catch (error) {
-      console.log('[voice] stopRecordingAndTranscribe: sarvam failed, falling back', getErrorMessage(error));
+      void error;
     }
   }
 
   const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
-  console.log('[voice] stopRecordingAndTranscribe: has API key', Boolean(apiKey));
   if (!apiKey) {
-    console.log('[voice] stopRecordingAndTranscribe: using fallback transcript');
     return fallbackTranscript(languageCode);
   }
 
@@ -93,12 +82,10 @@ export async function transcribeRecordedAudio(
 
   if (!response.ok) {
     const errorBody = await response.text();
-    console.log('[voice] stopRecordingAndTranscribe: transcription failed', response.status);
     throw new Error(`Transcription failed: ${response.status} ${errorBody}`);
   }
 
   const payload = (await response.json()) as { text?: string };
-  console.log('[voice] stopRecordingAndTranscribe: payload text present', Boolean(payload.text));
   if (!payload.text) {
     throw new Error('Transcription returned no text.');
   }
@@ -136,7 +123,6 @@ export async function buildFollowUpReply(learnerText: string, languageCode: Lang
   });
 
   if (!response.ok) {
-    console.log('[voice] buildFollowUpReply: completion failed', response.status);
     return fallbackFollowUpReply(learnerText, languageCode);
   }
 
@@ -381,7 +367,6 @@ async function speakWithSarvamTts(text: string): Promise<void> {
   if (!audioBase64) {
     throw new Error('Sarvam TTS returned no audio payload.');
   }
-  console.log('[voice] speakWithSarvamTts: received audio payload', { length: audioBase64.length });
   // For this iteration we validate Sarvam TTS response and use platform playback for reliability.
   await speakWithOptions(text, 'ta-IN');
 }
@@ -402,26 +387,12 @@ function speakWithOptions(text: string, languageCode?: LanguageCode): Promise<vo
       language: languageCode,
       pitch: languageCode === 'ta-IN' ? 1.0 : 1.05,
       rate: languageCode === 'ta-IN' ? 0.88 : 0.96,
-      onDone: () => {
-        console.log('[voice] speakTutorLine: done');
-        resolve();
-      },
-      onStopped: () => {
-        console.log('[voice] speakTutorLine: stopped');
-        resolve();
-      },
+      onDone: () => resolve(),
+      onStopped: () => resolve(),
       onError: (error) => {
-        console.log('[voice] speakTutorLine: onError', JSON.stringify(error));
+        void error;
         reject(new Error('Tutor speech playback failed.'));
       },
     });
   });
-}
-
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return 'Unknown error';
 }

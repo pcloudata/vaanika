@@ -1,4 +1,5 @@
 import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { COURSE_MODULES } from '../src/data/learning';
 import { useVaanika } from '../src/state/VaanikaContext';
@@ -9,6 +10,7 @@ export default function DashboardRoute() {
   const {
     courseProgress,
     dataStatus,
+    authStatus,
     language,
     learnerNeed,
     mockCourse,
@@ -19,6 +21,12 @@ export default function DashboardRoute() {
     startLesson,
     userId,
   } = useVaanika();
+
+  useEffect(() => {
+    if (authStatus === 'signed_out' || !userId) {
+      router.replace('/auth');
+    }
+  }, [authStatus, router, userId]);
 
   return (
     <ScreenShell homeHref="/">

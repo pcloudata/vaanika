@@ -1,9 +1,11 @@
 import { useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
+import { useVaanika } from '../src/state/VaanikaContext';
 import { PrimaryButton, ScreenShell, SecondaryButton, styles } from '../src/ui/VaanikaUI';
 
 export default function WelcomeRoute() {
   const router = useRouter();
+  const { authStatus } = useVaanika();
 
   return (
     <ScreenShell badgeLabel="MVP">
@@ -18,7 +20,10 @@ export default function WelcomeRoute() {
         <PrimaryButton label="Start onboarding" onPress={() => router.push('/onboarding')} />
         <SecondaryButton label="Sign in" onPress={() => router.push('/auth')} />
       </View>
-      <SecondaryButton label="Preview course" onPress={() => router.push('/dashboard')} />
+      <SecondaryButton
+        label="Preview course"
+        onPress={() => router.push(authStatus === 'signed_in' ? '/dashboard' : '/auth')}
+      />
     </ScreenShell>
   );
 }

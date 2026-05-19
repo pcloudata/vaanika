@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Text, View } from 'react-native';
 import { useVaanika } from '../src/state/VaanikaContext';
 import { PrimaryButton, ScreenShell, styles } from '../src/ui/VaanikaUI';
 
@@ -13,7 +14,14 @@ const ASSESSMENT_TASKS = [
 
 export default function AssessmentRoute() {
   const router = useRouter();
-  const { completeAssessment, language } = useVaanika();
+  const { authStatus, canSubmitAssessment, completeAssessment, language, userId } = useVaanika();
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (authStatus === 'signed_out' || !userId) {
+      router.replace('/auth');
+    }
+  }, [authStatus, router, userId]);
 
   return (
     <ScreenShell homeHref="/dashboard">
@@ -33,9 +41,15 @@ export default function AssessmentRoute() {
         </View>
       ))}
       <PrimaryButton
-        label="Submit assessment"
-        onPress={() => {
-          completeAssessment();
+        label={submitting ? 'Submitting...' : 'Submit assessment'}
+        onPress={async () => {
+          if (!canSubmitAssessment) {
+            Alert.alert('Assessment locked', 'Complete at least one lesson before submitting assessment.');
+            return;
+          }
+          setSubmitting(true);
+          await completeAssessment();
+          setSubmitting(false);
           router.replace('/badge');
         }}
       />

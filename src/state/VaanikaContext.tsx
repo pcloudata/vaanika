@@ -14,6 +14,7 @@ import {
   saveGeneratedCourse,
   type GeneratedCourse,
 } from '../services/course/mockCourseService';
+import { submitAssessmentAttempt, type AssessmentOutcome } from '../services/assessment/assessmentService';
 import { getLearnerProfile, saveLearnerProfile } from '../services/profile/profileService';
 import { getRuntimeProviders } from '../services/providerRegistry';
 import type { LanguageCode, LearnerProfile, LearningGoal, LearningLanguage, ProviderPlan } from '../types/learning';
@@ -22,11 +23,15 @@ import type { RuntimeProviders } from '../services/providerRegistry';
 type LessonStatus = 'not_started' | 'in_progress' | 'complete';
 
 type VaanikaState = {
+  assessmentFeedback: string;
+  assessmentPassed: boolean;
   assessmentScore: number;
+  awardedBadgeTitle: string;
   authError: string | null;
   authMode: 'mock' | 'supabase';
   authNotice: string | null;
   authStatus: 'loading' | 'signed_in' | 'signed_out';
+  canSubmitAssessment: boolean;
   courseProgress: `${number}%`;
   dataStatus: 'idle' | 'loading' | 'ready' | 'error';
   language: LearningLanguage;
@@ -39,7 +44,7 @@ type VaanikaState = {
   selectedGoal: LearningGoal;
   selectedLanguage: LanguageCode;
   userId: string | null;
-  completeAssessment: () => void;
+  completeAssessment: () => Promise<void>;
   completeLesson: () => void;
   generateCourse: () => Promise<void>;
   signIn: (credentials: AuthCredentials) => Promise<boolean>;
@@ -59,6 +64,9 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
   const [learnerNeed, setLearnerNeed] = useState('I want to speak confidently in daily conversations.');
   const [lessonStatus, setLessonStatus] = useState<LessonStatus>('not_started');
   const [assessmentScore, setAssessmentScore] = useState(0);
+  const [assessmentPassed, setAssessmentPassed] = useState(false);
+  const [assessmentFeedback, setAssessmentFeedback] = useState('Assessment not submitted yet.');
+  const [awardedBadgeTitle, setAwardedBadgeTitle] = useState('Pending certificate');
   const [mockCourse, setMockCourse] = useState<GeneratedCourse | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<VaanikaState['authStatus']>('loading');
@@ -71,7 +79,8 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
   const language = LANGUAGES.find((item) => item.code === selectedLanguage) ?? LANGUAGES[0];
   const providerPlan = useMemo(() => getProviderPlan(selectedLanguage), [selectedLanguage]);
   const runtimeProviders = useMemo(() => getRuntimeProviders(selectedLanguage), [selectedLanguage]);
-  const courseProgress = getCourseProgress(lessonStatus);
+  const courseProgress = getCourseProgress(lessonStatus, mockCourse);
+  const canSubmitAssessment = hasCompletedLesson(lessonStatus, mockCourse);
 
   useEffect(() => {
     let isMounted = true;
@@ -107,6 +116,10 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
   const value = useMemo<VaanikaState>(
     () => ({
       assessmentScore,
+      assessmentPassed,
+      assessmentFeedback,
+      awardedBadgeTitle,
+      canSubmitAssessment,
       authError,
       authMode,
       authNotice,
@@ -123,8 +136,57 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
       selectedGoal,
       selectedLanguage,
       userId,
-      completeAssessment: () => setAssessmentScore(selectedLanguage === 'ta-IN' ? 84 : 88),
-      completeLesson: () => setLessonStatus('complete'),
+      completeAssessment: async () => {
+        if (!hasCompletedLesson(lessonStatus, mockCourse)) {
+          setAssessmentScore(0);
+          setAssessmentPassed(false);
+          setAssessmentFeedback('Complete at least one lesson before submitting assessment.');
+          setAwardedBadgeTitle('Assessment locked');
+          return;
+        }
+
+        if (!mockCourse || !userId) {
+          const fallbackScore = selectedLanguage === 'ta-IN' ? 84 : 88;
+          setAssessmentScore(fallbackScore);
+          setAssessmentPassed(fallbackScore >= 75);
+          setAssessmentFeedback('Saved in local mode. Connect account and course for persisted scoring.');
+          setAwardedBadgeTitle(`${language.name} Conversation Basics`);
+          return;
+        }
+
+        const outcome: AssessmentOutcome = await submitAssessmentAttempt({
+          courseId: mockCourse.id,
+          languageCode: selectedLanguage,
+          learnerId: userId,
+          providerName: runtimeProviders.tutorBrain.name,
+        });
+        setAssessmentScore(outcome.score);
+        setAssessmentPassed(outcome.passed);
+        setAssessmentFeedback(outcome.feedback);
+        setAwardedBadgeTitle(outcome.badgeTitle);
+      },
+      completeLesson: () => {
+        setLessonStatus('complete');
+        setMockCourse((current) => {
+          if (!current) {
+            return current;
+          }
+
+          const nextModules = [...current.modules];
+          const moduleIndex = nextModules.findIndex((module) => module.progress !== '100%');
+          if (moduleIndex >= 0) {
+            nextModules[moduleIndex] = {
+              ...nextModules[moduleIndex],
+              progress: '100%',
+            };
+          }
+
+          return {
+            ...current,
+            modules: nextModules,
+          };
+        });
+      },
       generateCourse: async () => {
         setDataStatus('loading');
         const profile = await saveLearnerProfile({
@@ -145,6 +207,9 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
         setMockCourse(savedCourse);
         setLessonStatus('not_started');
         setAssessmentScore(0);
+        setAssessmentPassed(false);
+        setAssessmentFeedback('Assessment not submitted yet.');
+        setAwardedBadgeTitle('Pending certificate');
         setDataStatus('ready');
       },
       signIn: async (credentials) => {
@@ -193,6 +258,10 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
     }),
     [
       assessmentScore,
+      assessmentPassed,
+      assessmentFeedback,
+      awardedBadgeTitle,
+      canSubmitAssessment,
       authError,
       authMode,
       authNotice,
@@ -267,7 +336,16 @@ export function useVaanika() {
   return context;
 }
 
-function getCourseProgress(lessonStatus: LessonStatus): `${number}%` {
+function getCourseProgress(lessonStatus: LessonStatus, mockCourse: GeneratedCourse | null): `${number}%` {
+  if (mockCourse?.modules?.length) {
+    const total = mockCourse.modules.reduce((sum, module) => {
+      const value = Number.parseInt(module.progress.replace('%', ''), 10);
+      return sum + (Number.isNaN(value) ? 0 : value);
+    }, 0);
+    const average = Math.round(total / mockCourse.modules.length);
+    return `${Math.max(0, Math.min(100, average))}%`;
+  }
+
   if (lessonStatus === 'complete') {
     return '42%';
   }
@@ -277,4 +355,21 @@ function getCourseProgress(lessonStatus: LessonStatus): `${number}%` {
   }
 
   return COURSE_MODULES.length > 0 ? '8%' : '0%';
+}
+
+function hasCompletedLesson(lessonStatus: LessonStatus, mockCourse: GeneratedCourse | null): boolean {
+  if (lessonStatus === 'in_progress') {
+    return false;
+  }
+
+  if (lessonStatus === 'complete') {
+    return true;
+  }
+
+  return Boolean(
+    mockCourse?.modules?.some((module) => {
+      const value = Number.parseInt(module.progress.replace('%', ''), 10);
+      return !Number.isNaN(value) && value >= 100;
+    }),
+  );
 }

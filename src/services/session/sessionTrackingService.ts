@@ -81,6 +81,25 @@ export async function completeTrackedLessonSession(sessionId: string) {
   if (lessonError) {
     throw lessonError;
   }
+
+  const { data: lesson, error: lessonReadError } = await supabase
+    .from('lessons')
+    .select('module_id')
+    .eq('id', updatedSession.lesson_id)
+    .single();
+
+  if (lessonReadError) {
+    throw lessonReadError;
+  }
+
+  const { error: moduleProgressError } = await supabase
+    .from('course_modules')
+    .update({ progress_percent: 100 })
+    .eq('id', lesson.module_id);
+
+  if (moduleProgressError) {
+    throw moduleProgressError;
+  }
 }
 
 async function ensureLessonForCourse(courseId: string): Promise<string> {
