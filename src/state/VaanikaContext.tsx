@@ -17,7 +17,7 @@ import {
 import { submitAssessmentAttempt, type AssessmentOutcome } from '../services/assessment/assessmentService';
 import { getLearnerProfile, saveLearnerProfile } from '../services/profile/profileService';
 import { getRuntimeProviders } from '../services/providerRegistry';
-import { canSubmitAssessmentFromProgress, type LessonStatus } from './assessmentGate';
+import { getAssessmentEligibilityFromProgress, type LessonStatus } from './assessmentGate';
 import type {
   AssessmentResponses,
   AssessmentSubscores,
@@ -40,6 +40,7 @@ type VaanikaState = {
   authNotice: string | null;
   authStatus: 'loading' | 'signed_in' | 'signed_out';
   canSubmitAssessment: boolean;
+  assessmentBlockReason: string | null;
   courseProgress: `${number}%`;
   dataStatus: 'idle' | 'loading' | 'ready' | 'error';
   language: LearningLanguage;
@@ -89,7 +90,8 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
   const providerPlan = useMemo(() => getProviderPlan(selectedLanguage), [selectedLanguage]);
   const runtimeProviders = useMemo(() => getRuntimeProviders(selectedLanguage), [selectedLanguage]);
   const courseProgress = getCourseProgress(lessonStatus, mockCourse);
-  const canSubmitAssessment = canSubmitAssessmentFromProgress(lessonStatus, mockCourse?.modules);
+  const assessmentEligibility = getAssessmentEligibilityFromProgress(lessonStatus, mockCourse?.modules);
+  const canSubmitAssessment = assessmentEligibility.allowed;
 
   useEffect(() => {
     let isMounted = true;
@@ -130,6 +132,7 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
       assessmentSubscores,
       awardedBadgeTitle,
       canSubmitAssessment,
+      assessmentBlockReason: assessmentEligibility.reason,
       authError,
       authMode,
       authNotice,
@@ -147,10 +150,10 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
       selectedLanguage,
       userId,
       completeAssessment: async (responsesByTask) => {
-        if (!canSubmitAssessmentFromProgress(lessonStatus, mockCourse?.modules)) {
+        if (!assessmentEligibility.allowed) {
           setAssessmentScore(0);
           setAssessmentPassed(false);
-          setAssessmentFeedback('Complete at least one lesson before submitting assessment.');
+          setAssessmentFeedback(assessmentEligibility.reason ?? 'Assessment is locked.');
           setAssessmentSubscores(null);
           setAwardedBadgeTitle('Assessment locked');
           return;
@@ -278,6 +281,8 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
       assessmentSubscores,
       awardedBadgeTitle,
       canSubmitAssessment,
+      assessmentEligibility.allowed,
+      assessmentEligibility.reason,
       authError,
       authMode,
       authNotice,

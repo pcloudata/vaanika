@@ -36,17 +36,17 @@ export function ScreenShell({ badgeLabel = 'Live', children, homeHref }: ScreenS
   );
 }
 
-export function PrimaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+export function PrimaryButton({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={styles.primaryButton}>
+    <Pressable disabled={disabled} onPress={onPress} style={[styles.primaryButton, disabled && styles.primaryButtonDisabled]}>
       <Text style={styles.primaryButtonText}>{label}</Text>
     </Pressable>
   );
 }
 
-export function SecondaryButton({ label, onPress }: { label: string; onPress: () => void }) {
+export function SecondaryButton({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={styles.secondaryButton}>
+    <Pressable disabled={disabled} onPress={onPress} style={[styles.secondaryButton, disabled && styles.secondaryButtonDisabled]}>
       <Text style={styles.secondaryButtonText}>{label}</Text>
     </Pressable>
   );
@@ -145,6 +145,9 @@ export const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
+  primaryButtonDisabled: {
+    opacity: 0.55,
+  },
   primaryButtonText: {
     color: '#fffdf8',
     fontSize: 14,
@@ -162,6 +165,9 @@ export const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 14,
     paddingVertical: 13,
+  },
+  secondaryButtonDisabled: {
+    opacity: 0.6,
   },
   secondaryButtonText: {
     color: '#20352d',

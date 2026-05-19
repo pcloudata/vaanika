@@ -16,7 +16,7 @@ const ASSESSMENT_TASKS: Array<{ key: keyof AssessmentResponses; title: string; p
 
 export default function AssessmentRoute() {
   const router = useRouter();
-  const { authStatus, canSubmitAssessment, completeAssessment, language, userId } = useVaanika();
+  const { assessmentBlockReason, authStatus, canSubmitAssessment, completeAssessment, language, userId } = useVaanika();
   const [submitting, setSubmitting] = useState(false);
   const [responses, setResponses] = useState<AssessmentResponses>({
     speaking: '',
@@ -41,6 +41,9 @@ export default function AssessmentRoute() {
           Speaking roleplay, listening comprehension, vocabulary, reading, and short-response tasks
           determine badge readiness.
         </Text>
+        {!canSubmitAssessment && assessmentBlockReason ? (
+          <Text style={styles.optionMeta}>Locked: {assessmentBlockReason}</Text>
+        ) : null}
       </View>
       {ASSESSMENT_TASKS.map((task, index) => (
         <View key={task.key} style={styles.moduleCard}>
@@ -62,9 +65,10 @@ export default function AssessmentRoute() {
       ))}
       <PrimaryButton
         label={submitting ? 'Submitting...' : 'Submit assessment'}
+        disabled={submitting || !canSubmitAssessment}
         onPress={async () => {
           if (!canSubmitAssessment) {
-            Alert.alert('Assessment locked', 'Complete at least one lesson before submitting assessment.');
+            Alert.alert('Assessment locked', assessmentBlockReason ?? 'Complete at least one lesson before submitting assessment.');
             return;
           }
           const hasAnyMissing = ASSESSMENT_TASKS.some((task) => responses[task.key].trim().length < 8);
