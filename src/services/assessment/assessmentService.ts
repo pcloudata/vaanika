@@ -126,6 +126,9 @@ async function computeAssessmentScore(params: SubmitAssessmentParams): Promise<{
 
   const masteryScores = masteryResult.data ?? [];
   const completedSessionCount = sessionsResult.data?.length ?? 0;
+  if (completedSessionCount < 1) {
+    throw new Error('Complete at least one lesson session before submitting assessment.');
+  }
   const masteryAverage =
     masteryScores.length > 0
       ? masteryScores.reduce((sum, row) => sum + row.score, 0) / masteryScores.length

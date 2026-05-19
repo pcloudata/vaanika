@@ -47,10 +47,16 @@ export default function AssessmentRoute() {
             Alert.alert('Assessment locked', 'Complete at least one lesson before submitting assessment.');
             return;
           }
-          setSubmitting(true);
-          await completeAssessment();
-          setSubmitting(false);
-          router.replace('/badge');
+          try {
+            setSubmitting(true);
+            await completeAssessment();
+            router.replace('/badge');
+          } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Could not submit assessment right now.';
+            Alert.alert('Assessment blocked', message);
+          } finally {
+            setSubmitting(false);
+          }
         }}
       />
     </ScreenShell>
