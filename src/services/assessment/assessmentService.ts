@@ -1,5 +1,5 @@
 import { isSupabaseConfigured, supabase } from '../../backend/supabaseClient';
-import type { LanguageCode } from '../../types/learning';
+import type { AssessmentDimension, AssessmentResponses, AssessmentSubscores, LanguageCode } from '../../types/learning';
 
 export type AssessmentOutcome = {
   assessmentId: string | null;
@@ -9,6 +9,7 @@ export type AssessmentOutcome = {
   feedback: string;
   passed: boolean;
   score: number;
+  subscores: AssessmentSubscores;
 };
 
 type SubmitAssessmentParams = {
@@ -16,13 +17,27 @@ type SubmitAssessmentParams = {
   languageCode: LanguageCode;
   learnerId: string;
   providerName: string;
+  responsesByTask: AssessmentResponses;
 };
+
+type AssessmentComputation = {
+  feedback: string;
+  passed: boolean;
+  score: number;
+  subscores: AssessmentSubscores;
+};
+
+type AssessmentEligibilitySignals = {
+  completedLessonCount: number;
+  completedSessionCount: number;
+};
+
+const MODEL_NAME = 'gpt-4o-mini';
+const PASS_THRESHOLD = 75;
+const DIMENSIONS: AssessmentDimension[] = ['speaking', 'listening', 'vocabulary', 'reading', 'response'];
 
 export async function submitAssessmentAttempt(params: SubmitAssessmentParams): Promise<AssessmentOutcome> {
   const computed = await computeAssessmentScore(params);
-  const score = computed.score;
-  const passed = computed.passed;
-  const feedback = computed.feedback;
   const badgeTitle = getBadgeTitle(params.languageCode);
 
   if (!isSupabaseConfigured || !supabase) {
@@ -31,21 +46,23 @@ export async function submitAssessmentAttempt(params: SubmitAssessmentParams): P
       attemptId: null,
       badgeAwardId: null,
       badgeTitle,
-      feedback,
-      passed,
-      score,
+      feedback: computed.feedback,
+      passed: computed.passed,
+      score: computed.score,
+      subscores: computed.subscores,
     };
   }
 
   const assessmentId = await ensureAssessment(params.courseId, badgeTitle);
+  const payload = buildFeedbackPayload(computed);
   const { data: attempt, error: attemptError } = await supabase
     .from('assessment_attempts')
     .insert({
       assessment_id: assessmentId,
-      feedback: `${feedback} Scored by ${params.providerName}.`,
+      feedback: JSON.stringify(payload),
       learner_id: params.learnerId,
-      passed,
-      score,
+      passed: computed.passed,
+      score: computed.score,
     })
     .select('id')
     .single();
@@ -55,7 +72,7 @@ export async function submitAssessmentAttempt(params: SubmitAssessmentParams): P
   }
 
   let badgeAwardId: string | null = null;
-  if (passed) {
+  if (computed.passed) {
     const badgeId = await ensureBadgeForLanguage(params.languageCode, badgeTitle);
     const { data: award, error: awardError } = await supabase
       .from('badge_awards')
@@ -64,7 +81,7 @@ export async function submitAssessmentAttempt(params: SubmitAssessmentParams): P
           assessment_attempt_id: attempt.id,
           badge_id: badgeId,
           learner_id: params.learnerId,
-          score,
+          score: computed.score,
         },
         { onConflict: 'badge_id,learner_id' },
       )
@@ -83,69 +100,226 @@ export async function submitAssessmentAttempt(params: SubmitAssessmentParams): P
     attemptId: attempt.id,
     badgeAwardId,
     badgeTitle,
-    feedback,
-    passed,
-    score,
+    feedback: computed.feedback,
+    passed: computed.passed,
+    score: computed.score,
+    subscores: computed.subscores,
   };
 }
 
-async function computeAssessmentScore(params: SubmitAssessmentParams): Promise<{
-  feedback: string;
-  passed: boolean;
-  score: number;
-}> {
+export function parseAssessmentFeedback(feedback: string): Partial<AssessmentSubscores> & { notes?: string } {
+  try {
+    const parsed = JSON.parse(feedback) as Partial<AssessmentSubscores> & { notes?: string };
+    return parsed;
+  } catch {
+    return { notes: feedback };
+  }
+}
+
+export function isEligibleForAssessment(signals: AssessmentEligibilitySignals): boolean {
+  return signals.completedSessionCount >= 1 && signals.completedLessonCount >= 1;
+}
+
+export function computeWeightedOverall(subscores: Omit<AssessmentSubscores, 'overall' | 'notes'>): number {
+  return Math.round(
+    subscores.speaking * 0.25 +
+      subscores.listening * 0.2 +
+      subscores.vocabulary * 0.2 +
+      subscores.reading * 0.15 +
+      subscores.response * 0.2,
+  );
+}
+
+async function computeAssessmentScore(params: SubmitAssessmentParams): Promise<AssessmentComputation> {
   if (!isSupabaseConfigured || !supabase) {
-    const fallbackScore = params.languageCode === 'ta-IN' ? 76 : 78;
-    return {
-      feedback: 'Baseline scoring used in local mode. Complete more lessons for stronger confidence.',
-      passed: fallbackScore >= 75,
-      score: fallbackScore,
-    };
+    return deterministicFallback(params.responsesByTask, params.languageCode, 'Local mode fallback scoring used.');
   }
 
-  const [masteryResult, sessionsResult] = await Promise.all([
-    supabase
-      .from('mastery_scores')
-      .select('score')
-      .eq('learner_id', params.learnerId)
-      .eq('course_id', params.courseId),
+  const signals = await readEligibilitySignals(params.learnerId, params.courseId);
+  if (!isEligibleForAssessment(signals)) {
+    throw new Error('Complete at least one lesson and one completed lesson session before submitting assessment.');
+  }
+
+  const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    return deterministicFallback(params.responsesByTask, params.languageCode, 'OpenAI key missing. Deterministic fallback scoring used.');
+  }
+
+  const grading = await gradeWithModel(apiKey, params.languageCode, params.responsesByTask).catch(() =>
+    deterministicFallback(params.responsesByTask, params.languageCode, 'Model grading unavailable. Deterministic fallback scoring used.'),
+  );
+
+  const passed = grading.score >= PASS_THRESHOLD;
+  const feedback = passed
+    ? `${grading.subscores.notes} Passed with strong overall performance.`
+    : `${grading.subscores.notes} More guided practice recommended before certification.`;
+
+  return {
+    feedback,
+    passed,
+    score: grading.score,
+    subscores: grading.subscores,
+  };
+}
+
+async function gradeWithModel(
+  apiKey: string,
+  languageCode: LanguageCode,
+  responsesByTask: AssessmentResponses,
+): Promise<{ score: number; subscores: AssessmentSubscores }> {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: MODEL_NAME,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are an assessment grader. Return JSON with integer keys speaking,listening,vocabulary,reading,response (0-100) and notes (<=24 words).',
+        },
+        {
+          role: 'user',
+          content: `Language: ${languageCode}. Responses: ${JSON.stringify(responsesByTask)}`,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Model grading failed with status ${response.status}`);
+  }
+
+  const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const raw = payload.choices?.[0]?.message?.content;
+  if (!raw) {
+    throw new Error('Model grading returned empty content.');
+  }
+
+  const parsed = JSON.parse(raw) as Record<string, unknown>;
+  const speaking = normalizeScore(parsed.speaking);
+  const listening = normalizeScore(parsed.listening);
+  const vocabulary = normalizeScore(parsed.vocabulary);
+  const reading = normalizeScore(parsed.reading);
+  const responseScore = normalizeScore(parsed.response);
+  const notes = typeof parsed.notes === 'string' && parsed.notes.trim().length > 0 ? parsed.notes.trim() : 'Balanced performance across assessment dimensions.';
+
+  const overall = computeWeightedOverall({
+    speaking,
+    listening,
+    vocabulary,
+    reading,
+    response: responseScore,
+  });
+
+  return {
+    score: overall,
+    subscores: {
+      speaking,
+      listening,
+      vocabulary,
+      reading,
+      response: responseScore,
+      overall,
+      notes,
+    },
+  };
+}
+
+export const assessmentServiceTesting = {
+  deterministicFallback,
+  gradeWithModel,
+};
+
+async function readEligibilitySignals(learnerId: string, courseId: string): Promise<AssessmentEligibilitySignals> {
+  if (!supabase) {
+    return { completedLessonCount: 0, completedSessionCount: 0 };
+  }
+
+  const [sessionsResult, lessonsResult] = await Promise.all([
     supabase
       .from('lesson_sessions')
       .select('id')
-      .eq('learner_id', params.learnerId)
+      .eq('learner_id', learnerId)
       .eq('status', 'completed'),
+    supabase
+      .from('lessons')
+      .select('id')
+      .eq('completion_status', 'completed')
+      .in(
+        'module_id',
+        (
+          await supabase.from('course_modules').select('id').eq('course_id', courseId)
+        ).data?.map((row) => row.id) ?? [],
+      ),
   ]);
-
-  if (masteryResult.error) {
-    throw masteryResult.error;
-  }
 
   if (sessionsResult.error) {
     throw sessionsResult.error;
   }
 
-  const masteryScores = masteryResult.data ?? [];
-  const completedSessionCount = sessionsResult.data?.length ?? 0;
-  if (completedSessionCount < 1) {
-    throw new Error('Complete at least one lesson session before submitting assessment.');
+  if (lessonsResult.error) {
+    throw lessonsResult.error;
   }
-  const masteryAverage =
-    masteryScores.length > 0
-      ? masteryScores.reduce((sum, row) => sum + row.score, 0) / masteryScores.length
-      : 62;
-
-  const sessionBonus = Math.min(12, completedSessionCount * 3);
-  const score = clamp(Math.round(masteryAverage * 0.85 + sessionBonus), 40, 98);
-  const passed = score >= 75;
 
   return {
-    feedback: passed
-      ? `Strong overall performance with ${completedSessionCount} completed lesson session${
-          completedSessionCount === 1 ? '' : 's'
-        }.`
-      : 'Assessment result indicates more guided practice is needed before certification.',
-    passed,
-    score,
+    completedLessonCount: lessonsResult.data?.length ?? 0,
+    completedSessionCount: sessionsResult.data?.length ?? 0,
+  };
+}
+
+function deterministicFallback(
+  responsesByTask: AssessmentResponses,
+  languageCode: LanguageCode,
+  note: string,
+): AssessmentComputation {
+  const lengthScore = Math.min(
+    90,
+    Math.max(
+      45,
+      Math.round(
+        DIMENSIONS.reduce((sum, key) => sum + responsesByTask[key].trim().split(/\s+/).filter(Boolean).length, 0) /
+          DIMENSIONS.length *
+          6,
+      ),
+    ),
+  );
+
+  const base = languageCode === 'ta-IN' ? lengthScore + 2 : lengthScore;
+  const speaking = clamp(base, 40, 95);
+  const listening = clamp(base - 4, 35, 92);
+  const vocabulary = clamp(base - 2, 35, 93);
+  const reading = clamp(base - 5, 30, 90);
+  const response = clamp(base - 1, 35, 94);
+  const overall = computeWeightedOverall({ speaking, listening, vocabulary, reading, response });
+
+  const subscores: AssessmentSubscores = {
+    speaking,
+    listening,
+    vocabulary,
+    reading,
+    response,
+    overall,
+    notes: note,
+  };
+
+  return {
+    feedback: `${note} Continue regular tutor-led practice for stronger outcomes.`,
+    passed: overall >= PASS_THRESHOLD,
+    score: overall,
+    subscores,
+  };
+}
+
+function buildFeedbackPayload(computed: AssessmentComputation) {
+  return {
+    ...computed.subscores,
+    narrative: computed.feedback,
   };
 }
 
@@ -176,9 +350,9 @@ async function ensureAssessment(courseId: string, badgeTitle: string): Promise<s
       course_id: courseId,
       rubric: {
         listening: 20,
-        pronunciation: 20,
-        reading: 20,
+        reading: 15,
         response: 20,
+        speaking: 25,
         vocabulary: 20,
       },
       title: 'Mixed assessment',
@@ -246,6 +420,15 @@ function getBadgeTitle(languageCode: LanguageCode): string {
   }
 
   return 'English Conversation Basics';
+}
+
+function normalizeScore(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number.parseInt(String(value), 10);
+  if (Number.isNaN(parsed)) {
+    return 60;
+  }
+
+  return clamp(Math.round(parsed), 0, 100);
 }
 
 function clamp(value: number, min: number, max: number): number {

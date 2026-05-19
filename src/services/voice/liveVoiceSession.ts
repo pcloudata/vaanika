@@ -1,4 +1,5 @@
-import { requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
+import { createAudioPlayer, requestRecordingPermissionsAsync, setAudioModeAsync } from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
 import * as Speech from 'expo-speech';
 import type { LanguageCode } from '../../types/learning';
 import type { VoiceProviderName } from '../../types/learning';
@@ -6,6 +7,8 @@ import type { VoiceProviderName } from '../../types/learning';
 const TRANSCRIBE_MODEL = 'gpt-4o-mini-transcribe';
 const SARVAM_BASE_URL = process.env.EXPO_PUBLIC_SARVAM_BASE_URL ?? 'https://api.sarvam.ai';
 const SARVAM_TIMEOUT_MS = 12000;
+const SARVAM_PLAYBACK_TIMEOUT_MS = 30000;
+let activeSarvamPlayer: AudioPlayer | null = null;
 
 export async function prepareVoiceRuntime() {
   const permission = await requestRecordingPermissionsAsync();
@@ -36,6 +39,16 @@ export async function speakTutorLine(text: string, languageCode: LanguageCode, p
 
 export async function stopTutorSpeech(_providerName?: VoiceProviderName) {
   Speech.stop();
+  if (activeSarvamPlayer) {
+    try {
+      activeSarvamPlayer.pause();
+      activeSarvamPlayer.remove();
+    } catch {
+      // ignore cleanup failures
+    } finally {
+      activeSarvamPlayer = null;
+    }
+  }
 }
 
 export async function transcribeRecordedAudio(
@@ -367,8 +380,7 @@ async function speakWithSarvamTts(text: string): Promise<void> {
   if (!audioBase64) {
     throw new Error('Sarvam TTS returned no audio payload.');
   }
-  // For this iteration we validate Sarvam TTS response and use platform playback for reliability.
-  await speakWithOptions(text, 'ta-IN');
+  await playSarvamAudio(audioBase64);
 }
 
 async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
@@ -395,4 +407,41 @@ function speakWithOptions(text: string, languageCode?: LanguageCode): Promise<vo
       },
     });
   });
+}
+
+async function playSarvamAudio(audioBase64: string): Promise<void> {
+  const source = `data:audio/mp3;base64,${audioBase64}`;
+  const player = createAudioPlayer({ uri: source });
+  activeSarvamPlayer = player;
+
+  player.play();
+  const startedAt = Date.now();
+
+  while (true) {
+    if (!activeSarvamPlayer || player !== activeSarvamPlayer) {
+      return;
+    }
+
+    if (!player.playing) {
+      break;
+    }
+
+    if (Date.now() - startedAt > SARVAM_PLAYBACK_TIMEOUT_MS) {
+      throw new Error('Sarvam TTS playback timed out.');
+    }
+
+    await sleep(80);
+  }
+
+  try {
+    player.remove();
+  } finally {
+    if (activeSarvamPlayer === player) {
+      activeSarvamPlayer = null;
+    }
+  }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

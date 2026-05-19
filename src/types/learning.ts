@@ -53,3 +53,12 @@ export type TranscriptResult = {
   confidence: number;
   detectedLanguage: LanguageCode;
 };
+
+export type AssessmentDimension = 'speaking' | 'listening' | 'vocabulary' | 'reading' | 'response';
+
+export type AssessmentResponses = Record<AssessmentDimension, string>;
+
+export type AssessmentSubscores = Record<AssessmentDimension, number> & {
+  notes: string;
+  overall: number;
+};

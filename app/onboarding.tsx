@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { LANGUAGES, LEARNER_GOALS } from '../src/data/learning';
+import { shouldRedirectToAuth } from '../src/state/authGuard';
 import { useVaanika } from '../src/state/VaanikaContext';
 import { PrimaryButton, ScreenShell, styles } from '../src/ui/VaanikaUI';
 
@@ -11,7 +12,7 @@ export default function OnboardingRoute() {
     useVaanika();
 
   useEffect(() => {
-    if (authStatus === 'signed_out' || !userId) {
+    if (shouldRedirectToAuth(authStatus, userId)) {
       router.replace('/auth');
     }
   }, [authStatus, router, userId]);

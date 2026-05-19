@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { COURSE_MODULES } from '../src/data/learning';
+import { shouldRedirectToAuth } from '../src/state/authGuard';
 import { useVaanika } from '../src/state/VaanikaContext';
 import { Metric, PrimaryButton, ScreenShell, SecondaryButton, styles } from '../src/ui/VaanikaUI';
 
@@ -23,7 +24,7 @@ export default function DashboardRoute() {
   } = useVaanika();
 
   useEffect(() => {
-    if (authStatus === 'signed_out' || !userId) {
+    if (shouldRedirectToAuth(authStatus, userId)) {
       router.replace('/auth');
     }
   }, [authStatus, router, userId]);

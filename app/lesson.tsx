@@ -20,6 +20,7 @@ import {
   stopTutorSpeech,
 } from '../src/services/voice/liveVoiceSession';
 import { useVaanika } from '../src/state/VaanikaContext';
+import { shouldRedirectToAuth } from '../src/state/authGuard';
 import { PrimaryButton, ScreenShell, SecondaryButton, styles } from '../src/ui/VaanikaUI';
 import type { TutorMessage } from '../src/types/learning';
 
@@ -75,7 +76,7 @@ export default function LessonRoute() {
   }, []);
 
   useEffect(() => {
-    if (authStatus === 'signed_out' || !userId) {
+    if (shouldRedirectToAuth(authStatus, userId)) {
       router.replace('/auth');
     }
   }, [authStatus, router, userId]);
