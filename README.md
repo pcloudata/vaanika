@@ -18,6 +18,7 @@ npx tsc --noEmit
 npm run ios
 npm run android
 npm run web
+npm run e2e:web
 ```
 
 Expo web dependencies are installed for future preview work, but the product target is the mobile app.
@@ -47,6 +48,21 @@ E2E_PASSWORD=
 ```
 
 You can place them in `.env.local` at the repo root. Playwright loads this file automatically.
+
+For DB verification after E2E, add:
+
+```sh
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+Useful commands:
+
+```sh
+npm run db:list
+npm run db:push
+npm run db:verify
+npm run release:preflight:web
+```
 
 RLS is enabled for all learner-owned tables. Learner rows are scoped to `auth.uid()`.
 

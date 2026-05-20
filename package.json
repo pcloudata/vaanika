@@ -10,7 +10,9 @@
     "test": "vitest run",
     "e2e:web": "playwright test",
     "db:push": "supabase db push",
-    "db:list": "supabase migration list"
+    "db:list": "supabase migration list",
+    "db:verify": "node scripts/db-verify.mjs",
+    "release:preflight:web": "bash scripts/release-preflight-web.sh"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
