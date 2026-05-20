@@ -7,6 +7,7 @@ loadEnvLocal();
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY;
 const E2E_EMAIL = process.env.E2E_EMAIL;
+const VERIFY_MODE = process.env.DB_VERIFY_MODE ?? 'pass';
 
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   console.error('Missing EXPO_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY.');
@@ -28,8 +29,8 @@ async function main() {
     verifyTable('lesson_sessions', 'started_at', learnerId),
     verifyTranscripts(learnerId),
     verifyStepEvents(learnerId),
-    verifyAssessmentAttempts(learnerId),
-    verifyBadgeAwards(learnerId),
+    verifyAssessmentOutcome(learnerId, VERIFY_MODE),
+    verifyBadgeAwards(learnerId, VERIFY_MODE),
   ]);
 
   const failed = checks.find((check) => !check.ok);
@@ -144,7 +145,7 @@ async function verifyStepEvents(learnerId) {
   };
 }
 
-async function verifyAssessmentAttempts(learnerId) {
+async function verifyAssessmentOutcome(learnerId, mode) {
   const { data, error } = await supabase
     .from('assessment_attempts')
     .select('id, score, passed')
@@ -157,17 +158,36 @@ async function verifyAssessmentAttempts(learnerId) {
   }
 
   const latest = data?.[0];
+  const modeMatches = mode === 'fail' ? latest?.passed === false : latest?.passed === true;
   return {
-    ok: Boolean(latest),
+    ok: Boolean(latest) && modeMatches,
     name: 'assessment_attempts',
-    message: latest ? `latest score=${latest.score}, passed=${latest.passed}` : 'no assessment attempts found',
+    message: latest
+      ? `latest score=${latest.score}, passed=${latest.passed}, expected mode=${mode}`
+      : 'no assessment attempts found',
   };
 }
 
-async function verifyBadgeAwards(learnerId) {
+async function verifyBadgeAwards(learnerId, mode) {
+  const { data: attempts, error: attemptsError } = await supabase
+    .from('assessment_attempts')
+    .select('id, passed')
+    .eq('learner_id', learnerId)
+    .order('submitted_at', { ascending: false })
+    .limit(1);
+
+  if (attemptsError) {
+    return { ok: false, name: 'badge_awards', message: attemptsError.message };
+  }
+
+  const latestAttempt = attempts?.[0];
+  if (!latestAttempt) {
+    return { ok: false, name: 'badge_awards', message: 'no assessment attempt found for badge verification' };
+  }
+
   const { data, error } = await supabase
     .from('badge_awards')
-    .select('id, score')
+    .select('id, score, assessment_attempt_id')
     .eq('learner_id', learnerId)
     .order('issued_at', { ascending: false })
     .limit(1);
@@ -176,10 +196,24 @@ async function verifyBadgeAwards(learnerId) {
     return { ok: false, name: 'badge_awards', message: error.message };
   }
 
+  if (mode === 'fail') {
+    const matchesFailConstraint = !data?.length || data[0].assessment_attempt_id !== latestAttempt.id;
+    return {
+      ok: matchesFailConstraint,
+      name: 'badge_awards',
+      message: matchesFailConstraint
+        ? 'no badge award tied to latest failing attempt'
+        : 'badge award incorrectly tied to failing attempt',
+    };
+  }
+
+  const passValid = Boolean(data?.length) && data[0].assessment_attempt_id === latestAttempt.id;
   return {
-    ok: true,
+    ok: passValid,
     name: 'badge_awards',
-    message: data?.length ? `latest score=${data[0].score}` : 'no badge award found (valid if attempt did not pass)',
+    message: passValid
+      ? `latest score=${data[0].score}, linked attempt=${data[0].assessment_attempt_id}`
+      : 'latest passing attempt is not linked to a badge award',
   };
 }
 

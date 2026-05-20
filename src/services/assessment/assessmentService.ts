@@ -35,6 +35,7 @@ type AssessmentEligibilitySignals = {
 const MODEL_NAME = 'gpt-4o-mini';
 const PASS_THRESHOLD = 75;
 const DIMENSIONS: AssessmentDimension[] = ['speaking', 'listening', 'vocabulary', 'reading', 'response'];
+const FAIL_MODE_SCORE = 62;
 
 export async function submitAssessmentAttempt(params: SubmitAssessmentParams): Promise<AssessmentOutcome> {
   const computed = await computeAssessmentScore(params);
@@ -131,6 +132,25 @@ export function computeWeightedOverall(subscores: Omit<AssessmentSubscores, 'ove
 }
 
 async function computeAssessmentScore(params: SubmitAssessmentParams): Promise<AssessmentComputation> {
+  if (isE2EFailModeEnabled()) {
+    const forced = deterministicFallback(
+      params.responsesByTask,
+      params.languageCode,
+      'E2E fail mode override scoring used.',
+    );
+    const forcedSubscores: AssessmentSubscores = {
+      ...forced.subscores,
+      overall: FAIL_MODE_SCORE,
+      notes: 'E2E fail mode override scoring used.',
+    };
+    return {
+      feedback: 'E2E fail mode override scoring used. More guided practice recommended before certification.',
+      passed: false,
+      score: FAIL_MODE_SCORE,
+      subscores: forcedSubscores,
+    };
+  }
+
   if (!isSupabaseConfigured || !supabase) {
     return deterministicFallback(params.responsesByTask, params.languageCode, 'Local mode fallback scoring used.');
   }
@@ -234,7 +254,12 @@ async function gradeWithModel(
 export const assessmentServiceTesting = {
   deterministicFallback,
   gradeWithModel,
+  isE2EFailModeEnabled,
 };
+
+export function isE2EFailModeEnabled(): boolean {
+  return process.env.EXPO_PUBLIC_E2E_MODE === 'true' && process.env.EXPO_PUBLIC_E2E_ASSESSMENT_FORCE_FAIL === 'true';
+}
 
 async function readEligibilitySignals(learnerId: string, courseId: string): Promise<AssessmentEligibilitySignals> {
   if (!supabase) {

@@ -9,10 +9,13 @@
     "web": "expo start --web",
     "test": "vitest run",
     "e2e:web": "playwright test",
+    "e2e:web:fail": "EXPO_PUBLIC_E2E_MODE=true EXPO_PUBLIC_E2E_ASSESSMENT_FORCE_FAIL=true playwright test tests/e2e/assessment-fail-path.spec.js",
     "db:push": "supabase db push",
     "db:list": "supabase migration list",
     "db:verify": "node scripts/db-verify.mjs",
-    "release:preflight:web": "bash scripts/release-preflight-web.sh"
+    "db:verify:fail": "DB_VERIFY_MODE=fail node scripts/db-verify.mjs",
+    "release:preflight:web": "bash scripts/release-preflight-web.sh",
+    "release:preflight:web:fail": "bash scripts/release-preflight-web-fail.sh"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

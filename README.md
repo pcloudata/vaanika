@@ -62,6 +62,8 @@ npm run db:list
 npm run db:push
 npm run db:verify
 npm run release:preflight:web
+npm run e2e:web:fail
+npm run release:preflight:web:fail
 ```
 
 RLS is enabled for all learner-owned tables. Learner rows are scoped to `auth.uid()`.

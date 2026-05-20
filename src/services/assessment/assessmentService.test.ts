@@ -1,4 +1,4 @@
-import { assessmentServiceTesting, computeWeightedOverall, isEligibleForAssessment, parseAssessmentFeedback } from './assessmentService';
+import { assessmentServiceTesting, computeWeightedOverall, isE2EFailModeEnabled, isEligibleForAssessment, parseAssessmentFeedback } from './assessmentService';
 import type { AssessmentResponses } from '../../types/learning';
 
 const SAMPLE_RESPONSES: AssessmentResponses = {
@@ -12,6 +12,8 @@ const SAMPLE_RESPONSES: AssessmentResponses = {
 describe('assessmentService helpers', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    delete process.env.EXPO_PUBLIC_E2E_MODE;
+    delete process.env.EXPO_PUBLIC_E2E_ASSESSMENT_FORCE_FAIL;
   });
 
   it('enforces assessment eligibility requirements', () => {
@@ -89,5 +91,15 @@ describe('assessmentService helpers', () => {
     expect(fallback.score).toBeGreaterThanOrEqual(40);
     expect(fallback.subscores.overall).toBe(fallback.score);
     expect(fallback.feedback).toContain('Deterministic fallback');
+  });
+
+  it('enables forced fail mode only with both E2E flags', () => {
+    expect(isE2EFailModeEnabled()).toBe(false);
+
+    process.env.EXPO_PUBLIC_E2E_MODE = 'true';
+    expect(isE2EFailModeEnabled()).toBe(false);
+
+    process.env.EXPO_PUBLIC_E2E_ASSESSMENT_FORCE_FAIL = 'true';
+    expect(isE2EFailModeEnabled()).toBe(true);
   });
 });
