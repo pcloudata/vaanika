@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
+import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { Mic, Square } from 'lucide-react-native';
 import {
@@ -11,6 +11,7 @@ import {
 } from '../src/services/lesson/lessonOrchestrator';
 import { recordPracticeOutcome } from '../src/services/progress/masteryService';
 import { appendTranscriptTurn, completeTrackedLessonSession, startTrackedLessonSession } from '../src/services/session/sessionTrackingService';
+import { recordLessonStepEvent, type StepEventType } from '../src/services/session/stepMetricsService';
 import {
   buildFollowUpReply,
   buildSpokenFollowUpReply,
@@ -19,8 +20,8 @@ import {
   transcribeRecordedAudio,
   stopTutorSpeech,
 } from '../src/services/voice/liveVoiceSession';
-import { useVaanika } from '../src/state/VaanikaContext';
 import { shouldRedirectToAuth } from '../src/state/authGuard';
+import { useVaanika } from '../src/state/VaanikaContext';
 import { PrimaryButton, ScreenShell, SecondaryButton, styles } from '../src/ui/VaanikaUI';
 import type { TutorMessage } from '../src/types/learning';
 
@@ -36,36 +37,39 @@ export default function LessonRoute() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [stepIndex, setStepIndex] = useState(0);
   const [followUpCount, setFollowUpCount] = useState(0);
+  const [webInput, setWebInput] = useState('');
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
   const lessonPlan = useMemo(() => getLessonPlan(selectedLanguage), [selectedLanguage]);
   const currentStep = lessonPlan.steps[Math.min(stepIndex, lessonPlan.steps.length - 1)];
   const supportsInterruptions = true;
   const transcript = lessonTurns;
-  const introLine = useMemo(
-    () => buildStepGuidance(currentStep, language.name),
-    [currentStep, language.name],
-  );
+  const isWeb = Platform.OS === 'web';
+  const introLine = useMemo(() => buildStepGuidance(currentStep, language.name), [currentStep, language.name]);
   const voiceStatus = useMemo(() => {
+    if (isWeb) {
+      return busy ? 'Processing lesson response...' : 'Web lesson mode ready.';
+    }
     if (!voiceReady) {
       return 'Voice setup in progress...';
     }
-
     if (isRecordingInterruption) {
       return 'Listening to your interruption...';
     }
-
     if (busy) {
       return 'Processing voice...';
     }
-
     if (isTutorSpeaking) {
       return 'Tutor is speaking...';
     }
-
     return 'Voice ready.';
-  }, [voiceReady, isRecordingInterruption, busy, isTutorSpeaking]);
+  }, [busy, isRecordingInterruption, isTutorSpeaking, isWeb, voiceReady]);
 
   useEffect(() => {
+    if (isWeb) {
+      setVoiceReady(false);
+      return;
+    }
+
     prepareVoiceRuntime()
       .then(() => {
         setVoiceReady(true);
@@ -73,20 +77,168 @@ export default function LessonRoute() {
       .catch((error: unknown) => {
         Alert.alert('Voice setup failed', getErrorMessage(error));
       });
-  }, []);
+  }, [isWeb]);
 
-  useEffect(() => {
-    if (shouldRedirectToAuth(authStatus, userId)) {
-      router.replace('/auth');
-    }
-  }, [authStatus, router, userId]);
+  if (shouldRedirectToAuth(authStatus, userId)) {
+    return <Redirect href="/auth" />;
+  }
 
   useEffect(() => {
     setLessonTurns([]);
     setSessionId(null);
     setStepIndex(0);
     setFollowUpCount(0);
+    setWebInput('');
   }, [selectedLanguage]);
+
+  async function appendTurnAndPersist(params: {
+    learnerText: string;
+    tutorText: string;
+    eventType: StepEventType;
+    includeNextStep?: { teachLine: string; practicePrompt: string };
+  }) {
+    setLessonTurns((current) => {
+      const nextTurns: TutorMessage[] = [...current, { role: 'learner', text: params.learnerText }, { role: 'tutor', text: params.tutorText }];
+      if (params.includeNextStep) {
+        nextTurns.push({ role: 'tutor', text: params.includeNextStep.teachLine });
+        nextTurns.push({ role: 'tutor', text: params.includeNextStep.practicePrompt });
+      }
+      return nextTurns;
+    });
+
+    if (!sessionId) {
+      return;
+    }
+
+    await recordLessonStepEvent({
+      eventType: params.eventType,
+      learnerText: params.learnerText,
+      lessonSessionId: sessionId,
+      stepId: currentStep.id,
+      stepIndex,
+      tutorText: params.tutorText,
+    });
+
+    await appendTranscriptTurn({
+      provider: runtimeProviders.voice.name,
+      sessionId,
+      speaker: 'learner',
+      text: params.learnerText,
+    });
+    await appendTranscriptTurn({
+      provider: runtimeProviders.tutorBrain.name,
+      sessionId,
+      speaker: 'tutor',
+      text: params.tutorText,
+    });
+
+    if (params.includeNextStep) {
+      await appendTranscriptTurn({
+        provider: runtimeProviders.tutorBrain.name,
+        sessionId,
+        speaker: 'tutor',
+        text: params.includeNextStep.teachLine,
+      });
+      await appendTranscriptTurn({
+        provider: runtimeProviders.tutorBrain.name,
+        sessionId,
+        speaker: 'tutor',
+        text: params.includeNextStep.practicePrompt,
+      });
+    }
+  }
+
+  async function processLearnerInput(learnerText: string, spokenMode: boolean) {
+    const utteranceType = classifyLearnerUtterance(learnerText, currentStep, selectedLanguage);
+    let tutorText = '';
+    let tutorSpeechText = '';
+
+    if (utteranceType === 'unclear') {
+      tutorText = `I could not catch that clearly. Please repeat slowly: ${currentStep.practicePrompt}`;
+      tutorSpeechText = tutorText;
+      await appendTurnAndPersist({ learnerText, tutorText, eventType: 'unclear' });
+    } else if (utteranceType === 'followup') {
+      setFollowUpCount((count) => count + 1);
+      const followUpAnswer = await buildFollowUpReply(learnerText, selectedLanguage);
+      const resumeLine = `Let us continue with this step: ${currentStep.practicePrompt}`;
+      tutorText = `${followUpAnswer}\n\n${resumeLine}`;
+      tutorSpeechText = spokenMode
+        ? await buildSpokenFollowUpReply(learnerText, selectedLanguage, followUpAnswer)
+        : tutorText;
+      await appendTurnAndPersist({ learnerText, tutorText, eventType: 'followup' });
+    } else {
+      const evaluation = await evaluatePracticeResponse(learnerText, currentStep, selectedLanguage);
+      if (userId && mockCourse) {
+        await recordPracticeOutcome({
+          courseId: mockCourse.id,
+          learnerId: userId,
+          passed: evaluation.passed,
+        });
+      }
+
+      if (evaluation.passed) {
+        const isLastStep = stepIndex >= lessonPlan.steps.length - 1;
+        tutorText = isLastStep
+          ? `${evaluation.feedback} You completed this lesson. Tap Complete lesson to finish.`
+          : `${evaluation.feedback} Great, moving to the next step.`;
+        tutorSpeechText = tutorText;
+
+        if (!isLastStep) {
+          const nextStepIndex = stepIndex + 1;
+          const nextStep = lessonPlan.steps[nextStepIndex];
+          setStepIndex(nextStepIndex);
+          await appendTurnAndPersist({
+            learnerText,
+            tutorText,
+            eventType: 'practice_pass',
+            includeNextStep: { teachLine: nextStep.teachLine, practicePrompt: nextStep.practicePrompt },
+          });
+          if (spokenMode) {
+            await speakTutorLine(
+              `${tutorSpeechText} ${buildStepGuidance(nextStep, language.name)}`,
+              selectedLanguage,
+              runtimeProviders.voice.name,
+            );
+          }
+          return;
+        }
+
+        await appendTurnAndPersist({ learnerText, tutorText, eventType: 'practice_pass' });
+      } else {
+        tutorText = `${evaluation.feedback} Try again: ${currentStep.practicePrompt}`;
+        tutorSpeechText = tutorText;
+        await appendTurnAndPersist({ learnerText, tutorText, eventType: 'practice_retry' });
+      }
+    }
+
+    if (spokenMode) {
+      await speakTutorLine(tutorSpeechText, selectedLanguage, runtimeProviders.voice.name);
+    }
+  }
+
+  async function initializeLessonSession(playVoice: boolean) {
+    setBusy(true);
+    setLessonTurns([]);
+    setSessionId(null);
+    setWebInput('');
+    if (userId && mockCourse) {
+      const nextSessionId = await startTrackedLessonSession({
+        courseId: mockCourse.id,
+        learnerId: userId,
+        providerPlan,
+      });
+      if (nextSessionId) {
+        setSessionId(nextSessionId);
+      }
+    }
+    setLessonTurns([{ role: 'tutor', text: currentStep.teachLine }, { role: 'tutor', text: currentStep.practicePrompt }]);
+    if (playVoice) {
+      setIsTutorSpeaking(true);
+      await speakTutorLine(introLine, selectedLanguage, runtimeProviders.voice.name);
+    }
+    setBusy(false);
+    setIsTutorSpeaking(false);
+  }
 
   return (
     <ScreenShell homeHref="/dashboard">
@@ -95,8 +247,11 @@ export default function LessonRoute() {
         <View style={styles.sessionText}>
           <Text style={styles.sessionTitle}>{language.name} conversation practice</Text>
           <Text style={styles.sessionMeta}>
-            {runtimeProviders.voice.name} voice route. Transcript enabled.{' '}
-            {supportsInterruptions ? 'Realtime interruptions enabled.' : 'Turn-based fallback enabled.'}
+            {isWeb
+              ? 'Web lesson mode. Text-first interaction with tutor-led step progression and interruption logic.'
+              : `${runtimeProviders.voice.name} voice route. Transcript enabled. ${
+                  supportsInterruptions ? 'Realtime interruptions enabled.' : 'Turn-based fallback enabled.'
+                }`}
           </Text>
         </View>
       </View>
@@ -113,42 +268,24 @@ export default function LessonRoute() {
 
       <View style={styles.actionRow}>
         <SecondaryButton
-          label={isTutorSpeaking ? 'Stop tutor audio' : 'Start tutor audio'}
+          label={isWeb ? 'Start lesson' : isTutorSpeaking ? 'Stop tutor audio' : 'Start tutor audio'}
+          disabled={busy}
           onPress={async () => {
-            if (isTutorSpeaking) {
+            if (!isWeb && isTutorSpeaking) {
               await stopTutorSpeech(runtimeProviders.voice.name);
               setIsTutorSpeaking(false);
               return;
             }
 
-            if (!voiceReady || !introLine) {
+            if (!isWeb && (!voiceReady || !introLine)) {
               Alert.alert('Voice not ready', 'Please allow microphone access first.');
               return;
             }
 
             try {
-              setBusy(true);
-              setLessonTurns([]);
-              setSessionId(null);
-              if (userId && mockCourse) {
-                const nextSessionId = await startTrackedLessonSession({
-                  courseId: mockCourse.id,
-                  learnerId: userId,
-                  providerPlan,
-                });
-                if (nextSessionId) {
-                  setSessionId(nextSessionId);
-                }
-              }
-              setIsTutorSpeaking(true);
-              setLessonTurns([
-                { role: 'tutor', text: currentStep.teachLine },
-                { role: 'tutor', text: currentStep.practicePrompt },
-              ]);
-              await speakTutorLine(introLine, selectedLanguage, runtimeProviders.voice.name);
+              await initializeLessonSession(!isWeb);
             } catch (error: unknown) {
-              Alert.alert('Tutor audio failed', getErrorMessage(error));
-            } finally {
+              Alert.alert(isWeb ? 'Lesson start failed' : 'Tutor audio failed', getErrorMessage(error));
               setBusy(false);
               setIsTutorSpeaking(false);
             }
@@ -156,11 +293,14 @@ export default function LessonRoute() {
         />
         <PrimaryButton
           label="Complete lesson"
+          disabled={busy}
           onPress={async () => {
             try {
               setBusy(true);
-              await stopTutorSpeech(runtimeProviders.voice.name);
-              setIsTutorSpeaking(false);
+              if (!isWeb) {
+                await stopTutorSpeech(runtimeProviders.voice.name);
+                setIsTutorSpeaking(false);
+              }
               if (sessionId) {
                 await completeTrackedLessonSession(sessionId);
               }
@@ -174,161 +314,105 @@ export default function LessonRoute() {
           }}
         />
       </View>
-      <View style={{ alignItems: 'center', marginTop: 10 }}>
-        <Pressable
-          disabled={!voiceReady || busy}
-          onPress={async () => {
-            if (isRecordingInterruption) {
-              if (!hasRecording) {
+
+      {isWeb ? (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Ask or respond</Text>
+          <TextInput
+            editable={!busy}
+            onChangeText={setWebInput}
+            placeholder="Type your response or follow-up question..."
+            placeholderTextColor="#7b857f"
+            style={styles.textArea}
+            value={webInput}
+          />
+          <View style={{ marginTop: 10 }}>
+            <PrimaryButton
+              label="Send response"
+              disabled={busy || webInput.trim().length < 2}
+              onPress={async () => {
+                const nextInput = webInput.trim();
+                if (!nextInput) {
+                  return;
+                }
+                try {
+                  setBusy(true);
+                  setWebInput('');
+                  await processLearnerInput(nextInput, false);
+                } catch (error: unknown) {
+                  Alert.alert('Message failed', getErrorMessage(error));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />
+          </View>
+        </View>
+      ) : (
+        <View style={{ alignItems: 'center', marginTop: 10 }}>
+          <Pressable
+            disabled={!voiceReady || busy}
+            onPress={async () => {
+              if (isRecordingInterruption) {
+                if (!hasRecording) {
+                  return;
+                }
+
+                try {
+                  setBusy(true);
+                  setIsRecordingInterruption(false);
+                  await recorder.stop();
+                  const learnerText = await transcribeRecordedAudio(recorder.uri, selectedLanguage, runtimeProviders.voice.name);
+                  await processLearnerInput(learnerText, true);
+                } catch (error: unknown) {
+                  Alert.alert('Interruption failed', getErrorMessage(error));
+                } finally {
+                  setHasRecording(false);
+                  setBusy(false);
+                  setIsRecordingInterruption(false);
+                }
+                return;
+              }
+
+              if (!voiceReady || busy) {
                 return;
               }
 
               try {
-                setBusy(true);
-                setIsRecordingInterruption(false);
-                await recorder.stop();
-                const learnerText = await transcribeRecordedAudio(recorder.uri, selectedLanguage, runtimeProviders.voice.name);
-                const utteranceType = classifyLearnerUtterance(learnerText, currentStep, selectedLanguage);
-                let tutorText = '';
-                let tutorSpeechText = '';
-
-                if (utteranceType === 'unclear') {
-                  tutorText = `I could not catch that clearly. Please repeat slowly: ${currentStep.practicePrompt}`;
-                  tutorSpeechText = tutorText;
-                } else if (utteranceType === 'followup') {
-                  setFollowUpCount((count) => count + 1);
-                  const followUpAnswer = await buildFollowUpReply(learnerText, selectedLanguage);
-                  const resumeLine = `Let us continue with this step: ${currentStep.practicePrompt}`;
-                  tutorText = `${followUpAnswer}\n\n${resumeLine}`;
-                  tutorSpeechText = await buildSpokenFollowUpReply(learnerText, selectedLanguage, followUpAnswer);
-                } else {
-                  const evaluation = await evaluatePracticeResponse(learnerText, currentStep, selectedLanguage);
-                  if (userId && mockCourse) {
-                    await recordPracticeOutcome({
-                      courseId: mockCourse.id,
-                      learnerId: userId,
-                      passed: evaluation.passed,
-                    });
-                  }
-                  if (evaluation.passed) {
-                    const isLastStep = stepIndex >= lessonPlan.steps.length - 1;
-                    tutorText = isLastStep
-                      ? `${evaluation.feedback} You completed this lesson. Tap Complete lesson to finish.`
-                      : `${evaluation.feedback} Great, moving to the next step.`;
-                    tutorSpeechText = tutorText;
-                    if (!isLastStep) {
-                      const nextStepIndex = stepIndex + 1;
-                      const nextStep = lessonPlan.steps[nextStepIndex];
-                      setStepIndex(nextStepIndex);
-                      setLessonTurns((current) => [
-                        ...current,
-                        { role: 'learner', text: learnerText },
-                        { role: 'tutor', text: tutorText },
-                        { role: 'tutor', text: nextStep.teachLine },
-                        { role: 'tutor', text: nextStep.practicePrompt },
-                      ]);
-                      if (sessionId) {
-                        await appendTranscriptTurn({
-                          provider: runtimeProviders.voice.name,
-                          sessionId,
-                          speaker: 'learner',
-                          text: learnerText,
-                        });
-                        await appendTranscriptTurn({
-                          provider: runtimeProviders.tutorBrain.name,
-                          sessionId,
-                          speaker: 'tutor',
-                          text: tutorText,
-                        });
-                        await appendTranscriptTurn({
-                          provider: runtimeProviders.tutorBrain.name,
-                          sessionId,
-                          speaker: 'tutor',
-                          text: nextStep.teachLine,
-                        });
-                        await appendTranscriptTurn({
-                          provider: runtimeProviders.tutorBrain.name,
-                          sessionId,
-                          speaker: 'tutor',
-                          text: nextStep.practicePrompt,
-                        });
-                      }
-                      await speakTutorLine(
-                        `${tutorSpeechText} ${buildStepGuidance(nextStep, language.name)}`,
-                        selectedLanguage,
-                        runtimeProviders.voice.name,
-                      );
-                      return;
-                    }
-                  } else {
-                    tutorText = `${evaluation.feedback} Try again: ${currentStep.practicePrompt}`;
-                    tutorSpeechText = tutorText;
-                  }
-                }
-                setLessonTurns((current) => [...current, { role: 'learner', text: learnerText }, { role: 'tutor', text: tutorText }]);
-                if (sessionId) {
-                  await appendTranscriptTurn({
-                    provider: runtimeProviders.voice.name,
-                    sessionId,
-                    speaker: 'learner',
-                    text: learnerText,
-                  });
-                  await appendTranscriptTurn({
-                    provider: runtimeProviders.tutorBrain.name,
-                    sessionId,
-                    speaker: 'tutor',
-                    text: tutorText,
-                  });
-                }
-                await speakTutorLine(tutorSpeechText, selectedLanguage, runtimeProviders.voice.name);
+                await stopTutorSpeech(runtimeProviders.voice.name);
+                setIsTutorSpeaking(false);
+                await recorder.prepareToRecordAsync();
+                recorder.record();
+                setIsRecordingInterruption(true);
+                setHasRecording(true);
               } catch (error: unknown) {
-                Alert.alert('Interruption failed', getErrorMessage(error));
-              } finally {
-                setHasRecording(false);
-                setBusy(false);
-                setIsRecordingInterruption(false);
+                Alert.alert('Recording failed', getErrorMessage(error));
               }
-              return;
-            }
+            }}
+            style={{
+              alignItems: 'center',
+              backgroundColor: isRecordingInterruption ? '#c7422b' : '#20352d',
+              borderRadius: 32,
+              height: 64,
+              justifyContent: 'center',
+              opacity: !voiceReady || busy ? 0.6 : 1,
+              width: 64,
+            }}
+          >
+            {busy ? (
+              <ActivityIndicator color="#fffdf8" />
+            ) : isRecordingInterruption ? (
+              <Square color="#fffdf8" size={24} />
+            ) : (
+              <Mic color="#fffdf8" size={24} />
+            )}
+          </Pressable>
+          <Text style={[styles.sessionMeta, { marginTop: 8 }]}>
+            {isRecordingInterruption ? 'Tap to stop and send' : 'Tap mic to speak'}
+          </Text>
+        </View>
+      )}
 
-            if (!voiceReady || busy) {
-              return;
-            }
-
-            try {
-              await stopTutorSpeech(runtimeProviders.voice.name);
-              setIsTutorSpeaking(false);
-
-              await recorder.prepareToRecordAsync();
-              recorder.record();
-              setIsRecordingInterruption(true);
-              setHasRecording(true);
-            } catch (error: unknown) {
-              Alert.alert('Recording failed', getErrorMessage(error));
-            }
-          }}
-          style={{
-            alignItems: 'center',
-            backgroundColor: isRecordingInterruption ? '#c7422b' : '#20352d',
-            borderRadius: 32,
-            height: 64,
-            justifyContent: 'center',
-            opacity: !voiceReady || busy ? 0.6 : 1,
-            width: 64,
-          }}
-        >
-          {busy ? (
-            <ActivityIndicator color="#fffdf8" />
-          ) : isRecordingInterruption ? (
-            <Square color="#fffdf8" size={24} />
-          ) : (
-            <Mic color="#fffdf8" size={24} />
-          )}
-        </Pressable>
-        <Text style={[styles.sessionMeta, { marginTop: 8 }]}>
-          {isRecordingInterruption ? 'Tap to stop and send' : 'Tap mic to speak'}
-        </Text>
-      </View>
       <Text style={styles.sessionMeta}>{voiceStatus}</Text>
       <Text style={styles.sessionMeta}>
         Step {Math.min(stepIndex + 1, lessonPlan.steps.length)} of {lessonPlan.steps.length} in {lessonPlan.title}

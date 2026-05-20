@@ -38,7 +38,12 @@ export function ScreenShell({ badgeLabel = 'Live', children, homeHref }: ScreenS
 
 export function PrimaryButton({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable disabled={disabled} onPress={onPress} style={[styles.primaryButton, disabled && styles.primaryButtonDisabled]}>
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.primaryButton, disabled && styles.primaryButtonDisabled]}
+    >
       <Text style={styles.primaryButtonText}>{label}</Text>
     </Pressable>
   );
@@ -46,7 +51,12 @@ export function PrimaryButton({ label, onPress, disabled = false }: { label: str
 
 export function SecondaryButton({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable disabled={disabled} onPress={onPress} style={[styles.secondaryButton, disabled && styles.secondaryButtonDisabled]}>
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.secondaryButton, disabled && styles.secondaryButtonDisabled]}
+    >
       <Text style={styles.secondaryButtonText}>{label}</Text>
     </Pressable>
   );

@@ -1,5 +1,4 @@
-import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { Redirect, useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
 import { shouldRedirectToAuth } from '../src/state/authGuard';
 import { useVaanika } from '../src/state/VaanikaContext';
@@ -11,11 +10,9 @@ export default function BadgeRoute() {
   const bestDimension = getDimensionLabel(getTopDimension(assessmentSubscores, 'max'));
   const weakestDimension = getDimensionLabel(getTopDimension(assessmentSubscores, 'min'));
 
-  useEffect(() => {
-    if (shouldRedirectToAuth(authStatus, userId)) {
-      router.replace('/auth');
-    }
-  }, [authStatus, router, userId]);
+  if (shouldRedirectToAuth(authStatus, userId)) {
+    return <Redirect href="/auth" />;
+  }
 
   return (
     <ScreenShell homeHref="/dashboard">

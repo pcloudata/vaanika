@@ -1,5 +1,4 @@
-import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { Redirect, useRouter } from 'expo-router';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { LANGUAGES, LEARNER_GOALS } from '../src/data/learning';
 import { shouldRedirectToAuth } from '../src/state/authGuard';
@@ -11,11 +10,9 @@ export default function OnboardingRoute() {
   const { authStatus, generateCourse, learnerNeed, selectedGoal, selectedLanguage, setLearnerNeed, setSelectedGoal, setSelectedLanguage, userId } =
     useVaanika();
 
-  useEffect(() => {
-    if (shouldRedirectToAuth(authStatus, userId)) {
-      router.replace('/auth');
-    }
-  }, [authStatus, router, userId]);
+  if (shouldRedirectToAuth(authStatus, userId)) {
+    return <Redirect href="/auth" />;
+  }
 
   return (
     <ScreenShell homeHref="/dashboard">

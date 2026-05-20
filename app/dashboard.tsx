@@ -1,5 +1,4 @@
-import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { Redirect, useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
 import { COURSE_MODULES } from '../src/data/learning';
 import { shouldRedirectToAuth } from '../src/state/authGuard';
@@ -23,11 +22,9 @@ export default function DashboardRoute() {
     userId,
   } = useVaanika();
 
-  useEffect(() => {
-    if (shouldRedirectToAuth(authStatus, userId)) {
-      router.replace('/auth');
-    }
-  }, [authStatus, router, userId]);
+  if (shouldRedirectToAuth(authStatus, userId)) {
+    return <Redirect href="/auth" />;
+  }
 
   return (
     <ScreenShell homeHref="/">

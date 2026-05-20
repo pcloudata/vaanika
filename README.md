@@ -17,9 +17,11 @@ npm install
 npx tsc --noEmit
 npm run ios
 npm run android
+npm run web
 ```
 
 Expo web dependencies are installed for future preview work, but the product target is the mobile app.
+The current rollout includes a web fallback lesson mode with text-first interactions.
 
 ## Supabase Setup
 
@@ -37,6 +39,15 @@ EXPO_PUBLIC_SUPABASE_URL=
 EXPO_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
+For web integration/e2e tests, optionally provide:
+
+```sh
+E2E_EMAIL=
+E2E_PASSWORD=
+```
+
+You can place them in `.env.local` at the repo root. Playwright loads this file automatically.
+
 RLS is enabled for all learner-owned tables. Learner rows are scoped to `auth.uid()`.
 
 ## Current Implementation
@@ -49,6 +60,8 @@ RLS is enabled for all learner-owned tables. Learner rows are scoped to `auth.ui
 - `src/backend/supabaseClient.ts` initializes Supabase only when public env vars are set.
 - `src/services/auth` and `src/services/profile` contain Supabase-backed auth/profile calls with mock-mode fallbacks.
 - `src/backend/schemaPlan.ts` documents the Supabase entities and planned edge functions.
+- `docs/web-qa-seed-checklist.md` captures web seed data and SQL verification checks.
+- `docs/vercel-release-checklist.md` captures release preflight and deployment checks.
 
 ## Next Build Steps
 
