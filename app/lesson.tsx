@@ -23,6 +23,7 @@ import {
 import { shouldRedirectToAuth } from '../src/state/authGuard';
 import { useVaanika } from '../src/state/VaanikaContext';
 import { PrimaryButton, ScreenShell, SecondaryButton, styles } from '../src/ui/VaanikaUI';
+import { WebBanner, webStyles } from '../src/web/WebShell';
 import { WEB_IMAGES } from '../src/web/webImages';
 import type { TutorMessage } from '../src/types/learning';
 
@@ -246,6 +247,13 @@ export default function LessonRoute() {
       homeHref="/dashboard"
       pageBackgroundUri={WEB_IMAGES.pageBackground}
     >
+      {isWeb ? (
+        <WebBanner
+          imageUri={WEB_IMAGES.lessonBanner}
+          title={`${language.name} tutor session`}
+          subtitle="Text-first web lesson with follow-up interruption handling and guided step progression."
+        />
+      ) : null}
       <View style={styles.sessionCard}>
         <View style={styles.pulse} />
         <View style={styles.sessionText}>
@@ -260,15 +268,17 @@ export default function LessonRoute() {
         </View>
       </View>
 
-      {transcript.map((message, index) => (
-        <View
-          key={`${message.role}-${index}-${message.text}`}
-          style={[styles.message, message.role === 'learner' ? styles.learnerMessage : styles.tutorMessage]}
-        >
-          <Text style={styles.messageRole}>{message.role === 'learner' ? 'You' : 'Vaanika'}</Text>
-          <Text style={styles.messageText}>{message.text}</Text>
-        </View>
-      ))}
+      <View style={isWeb ? webStyles.transcriptPanel : undefined}>
+        {transcript.map((message, index) => (
+          <View
+            key={`${message.role}-${index}-${message.text}`}
+            style={[styles.message, message.role === 'learner' ? styles.learnerMessage : styles.tutorMessage]}
+          >
+            <Text style={styles.messageRole}>{message.role === 'learner' ? 'You' : 'Vaanika'}</Text>
+            <Text style={styles.messageText}>{message.text}</Text>
+          </View>
+        ))}
+      </View>
 
       <View style={styles.actionRow}>
         <SecondaryButton
@@ -417,11 +427,26 @@ export default function LessonRoute() {
         </View>
       )}
 
-      <Text style={styles.sessionMeta}>{voiceStatus}</Text>
-      <Text style={styles.sessionMeta}>
-        Step {Math.min(stepIndex + 1, lessonPlan.steps.length)} of {lessonPlan.steps.length} in {lessonPlan.title}
-      </Text>
-      <Text style={styles.sessionMeta}>Voice follow-ups captured: {followUpCount}</Text>
+      {isWeb ? (
+        <View style={styles.providerPanel}>
+          <Text style={styles.providerTitle}>Session status</Text>
+          <Text style={styles.providerCopy}>{voiceStatus}</Text>
+          <Text style={styles.providerCopy}>
+            Step {Math.min(stepIndex + 1, lessonPlan.steps.length)} of {lessonPlan.steps.length} in {lessonPlan.title}
+          </Text>
+          <Text style={styles.providerCopy}>Voice follow-ups captured: {followUpCount}</Text>
+          <Text style={styles.providerCopy}>Voice route: {runtimeProviders.voice.name}</Text>
+          <Text style={styles.providerCopy}>Tutor route: {runtimeProviders.tutorBrain.name}</Text>
+        </View>
+      ) : (
+        <>
+          <Text style={styles.sessionMeta}>{voiceStatus}</Text>
+          <Text style={styles.sessionMeta}>
+            Step {Math.min(stepIndex + 1, lessonPlan.steps.length)} of {lessonPlan.steps.length} in {lessonPlan.title}
+          </Text>
+          <Text style={styles.sessionMeta}>Voice follow-ups captured: {followUpCount}</Text>
+        </>
+      )}
     </ScreenShell>
   );
 }

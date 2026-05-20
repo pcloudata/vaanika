@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { shouldRedirectToAuth } from '../src/state/authGuard';
 import { useVaanika } from '../src/state/VaanikaContext';
 import { Metric, PrimaryButton, ScreenShell, styles } from '../src/ui/VaanikaUI';
+import { WebBanner } from '../src/web/WebShell';
 import { WEB_IMAGES } from '../src/web/webImages';
 
 export default function BadgeRoute() {
@@ -20,6 +21,11 @@ export default function BadgeRoute() {
       homeHref="/dashboard"
       pageBackgroundUri={WEB_IMAGES.pageBackground}
     >
+      <WebBanner
+        imageUri={WEB_IMAGES.badgeBanner}
+        title={assessmentPassed ? 'Skill badge earned' : 'Assessment completed'}
+        subtitle="Model-graded result with section strengths and next-step guidance."
+      />
       <View style={styles.badgeCard}>
         <Text style={styles.eyebrow}>{assessmentPassed ? 'Skill badge earned' : 'Assessment submitted'}</Text>
         <Text style={styles.badgeName}>{awardedBadgeTitle}</Text>

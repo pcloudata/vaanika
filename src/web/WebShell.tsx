@@ -218,6 +218,27 @@ export const webStyles = StyleSheet.create({
     flex: 1,
     gap: 18,
   },
+  lessonGrid: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 18,
+  },
+  lessonMain: {
+    flex: 1.2,
+    gap: 16,
+  },
+  lessonSide: {
+    flex: 0.8,
+    gap: 16,
+  },
+  transcriptPanel: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d7dde2',
+    gap: 10,
+    padding: 16,
+  },
   previewRow: {
     alignItems: 'center',
     flexDirection: 'row',

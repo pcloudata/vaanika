@@ -18,7 +18,7 @@ test.describe('assessment and badge web flow', () => {
   test('learner sees lock reason before completion, then can submit and reach badge', async ({ page }) => {
     await signInAndEnsureDashboard(page, E2E_EMAIL || '', E2E_PASSWORD || '');
 
-    await clickVisibleByText(page, 'Assessment');
+    await page.getByRole('button', { name: 'Assessment' }).first().click();
     await expect(page).toHaveURL(/\/assessment$/);
 
     const isLocked = await page.getByText(/Locked:/).first().isVisible().catch(() => false);
@@ -30,7 +30,7 @@ test.describe('assessment and badge web flow', () => {
       await clickVisibleByText(page, 'Start lesson');
       await clickVisibleByText(page, 'Complete lesson');
       await expect(page).toHaveURL(/\/dashboard$/);
-      await clickVisibleByText(page, 'Assessment');
+      await page.getByRole('button', { name: 'Assessment' }).first().click();
       await expect(page).toHaveURL(/\/assessment$/);
     }
 
@@ -38,8 +38,8 @@ test.describe('assessment and badge web flow', () => {
 
     await clickVisibleByText(page, 'Submit assessment');
     await expect(page).toHaveURL(/\/badge$/, { timeout: 30000 });
-    await expect(page.getByText(/Assessment submitted|Skill badge earned/)).toBeVisible({ timeout: 20000 });
-    await expect(page.getByText(/Score/)).toBeVisible();
+    await expect(page.getByText(/Assessment submitted|Skill badge earned/).first()).toBeVisible({ timeout: 20000 });
+    await expect(page.getByText(/Score/).first()).toBeVisible();
   });
 });
 

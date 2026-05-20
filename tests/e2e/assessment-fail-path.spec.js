@@ -19,7 +19,7 @@ test.describe('assessment fail path web flow', () => {
 
   test('forced-fail submission shows retry state and no pass badge messaging', async ({ page }) => {
     await signInAndEnsureDashboard(page, E2E_EMAIL || '', E2E_PASSWORD || '');
-    await clickVisibleByText(page, 'Assessment');
+    await page.getByRole('button', { name: 'Assessment' }).first().click();
     await expect(page).toHaveURL(/\/assessment$/);
 
     const isLocked = await page.getByText(/Locked:/).first().isVisible().catch(() => false);
@@ -30,7 +30,7 @@ test.describe('assessment fail path web flow', () => {
       await clickVisibleByText(page, 'Start lesson');
       await clickVisibleByText(page, 'Complete lesson');
       await expect(page).toHaveURL(/\/dashboard$/);
-      await clickVisibleByText(page, 'Assessment');
+      await page.getByRole('button', { name: 'Assessment' }).first().click();
       await expect(page).toHaveURL(/\/assessment$/);
     }
 
