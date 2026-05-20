@@ -1,8 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useVaanika } from '../src/state/VaanikaContext';
 import { PrimaryButton, ScreenShell, SecondaryButton, styles } from '../src/ui/VaanikaUI';
+import { WebBanner, WebShell, webStyles } from '../src/web/WebShell';
+import { WEB_IMAGES } from '../src/web/webImages';
 
 type AuthFormMode = 'sign_in' | 'sign_up';
 
@@ -40,6 +42,119 @@ export default function AuthRoute() {
       setIsSubmitting(false);
     }
   };
+
+  if (Platform.OS === 'web') {
+    return (
+      <WebShell
+        homeHref="/"
+        pageBackgroundUri={WEB_IMAGES.pageBackground}
+      >
+        <WebBanner
+          imageUri={WEB_IMAGES.authBanner}
+          title="Your learning account"
+          subtitle="Save progress, continue lessons, and keep your assessment history in one place."
+        />
+        <View style={webStyles.authGrid}>
+          <View style={webStyles.authMain}>
+            <View style={webStyles.authCard}>
+              <Text style={webStyles.sectionLabel}>{authMode === 'mock' ? 'Mock auth' : 'Supabase auth'}</Text>
+              <Text style={styles.summaryTitle}>Learner account</Text>
+              <Text style={styles.summaryCopy}>
+                Continue your personalized learning plan, lesson history, and assessment progress.
+              </Text>
+              <Text style={styles.authStatus}>Status: {authStatus.replace('_', ' ')}</Text>
+
+              <View style={styles.segmentGroup}>
+                {(['sign_in', 'sign_up'] as const).map((mode) => (
+                  <Pressable
+                    key={mode}
+                    onPress={() => {
+                      setFormMode(mode);
+                      setLocalError(null);
+                    }}
+                    style={[styles.segment, formMode === mode && styles.segmentActive]}
+                  >
+                    <Text style={[styles.segmentText, formMode === mode && styles.segmentTextActive]}>
+                      {mode === 'sign_in' ? 'Sign in' : 'Create account'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              <View style={webStyles.formGrid}>
+                <Text style={webStyles.formLabel}>Email</Text>
+                <TextInput
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  onChangeText={setEmail}
+                  placeholder="you@example.com"
+                  placeholderTextColor="#7b857f"
+                  style={styles.textInput}
+                  value={email}
+                />
+                <Text style={webStyles.formLabel}>Password</Text>
+                <View style={styles.passwordField}>
+                  <TextInput
+                    onChangeText={setPassword}
+                    placeholder="Minimum 6 characters"
+                    placeholderTextColor="#7b857f"
+                    secureTextEntry={!isPasswordVisible}
+                    style={styles.passwordInput}
+                    value={password}
+                  />
+                  <Pressable
+                    accessibilityLabel={isPasswordVisible ? 'Hide password' : 'Show password'}
+                    onPress={() => setIsPasswordVisible((current) => !current)}
+                    style={styles.passwordToggle}
+                  >
+                    <Text style={styles.passwordToggleText}>{isPasswordVisible ? '◉' : '◎'}</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {authNotice && <Text style={styles.noticeText}>{authNotice}</Text>}
+              {(localError || authError) && <Text style={styles.errorText}>{localError ?? authError}</Text>}
+
+              <View style={styles.actionRow}>
+                <PrimaryButton
+                  label={isSubmitting ? 'Working...' : formMode === 'sign_in' ? 'Sign in' : 'Create account'}
+                  onPress={() => {
+                    void submit();
+                  }}
+                />
+                <SecondaryButton
+                  label={formMode === 'sign_in' ? 'Need an account?' : 'Already have one?'}
+                  onPress={() => {
+                    setFormMode(formMode === 'sign_in' ? 'sign_up' : 'sign_in');
+                    setLocalError(null);
+                  }}
+                />
+              </View>
+            </View>
+          </View>
+          <View style={webStyles.authSide}>
+            <View style={webStyles.sideCard}>
+              <Text style={webStyles.sectionLabel}>Why sign in</Text>
+              <Text style={webStyles.sideTitle}>Continue where you left off</Text>
+              <Text style={webStyles.sideCopy}>
+                Lessons, follow-up history, and assessment attempts are tied to your learner account.
+              </Text>
+              <View style={webStyles.kpiRow}>
+                <View style={webStyles.kpiCard}>
+                  <Text style={webStyles.kpiLabel}>Tutor style</Text>
+                  <Text style={webStyles.kpiValue}>Adaptive</Text>
+                </View>
+                <View style={webStyles.kpiCard}>
+                  <Text style={webStyles.kpiLabel}>Mode</Text>
+                  <Text style={webStyles.kpiValue}>Interactive</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+      </WebShell>
+    );
+  }
 
   return (
     <ScreenShell homeHref="/">

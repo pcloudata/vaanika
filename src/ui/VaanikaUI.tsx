@@ -1,18 +1,19 @@
 import { Link, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type ScreenShellProps = {
   badgeLabel?: string;
   children: ReactNode;
   homeHref?: Href;
+  pageBackgroundUri?: string;
 };
 
-export function ScreenShell({ badgeLabel = 'Live', children, homeHref }: ScreenShellProps) {
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.page}>
+export function ScreenShell({ badgeLabel = 'Live', children, homeHref, pageBackgroundUri }: ScreenShellProps) {
+  const shellBody = (
+    <ScrollView contentContainerStyle={styles.page}>
+      <View style={styles.content}>
         <View style={styles.header}>
           <View style={styles.brandBlock}>
             <Text style={styles.brand}>Vaanika</Text>
@@ -31,7 +32,24 @@ export function ScreenShell({ badgeLabel = 'Live', children, homeHref }: ScreenS
           )}
         </View>
         {children}
-      </ScrollView>
+      </View>
+    </ScrollView>
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      {Platform.OS === 'web' && pageBackgroundUri ? (
+        <ImageBackground
+          source={{ uri: pageBackgroundUri }}
+          style={styles.pageBackground}
+          imageStyle={styles.pageBackgroundImage}
+        >
+          <View style={styles.pageBackgroundOverlay} />
+          {shellBody}
+        </ImageBackground>
+      ) : (
+        shellBody
+      )}
     </SafeAreaView>
   );
 }
@@ -74,12 +92,29 @@ export function Metric({ label, value }: { label: string; value: string }) {
 export const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f7f4ee',
+    backgroundColor: '#f7f8fa',
+  },
+  pageBackground: {
+    flex: 1,
+  },
+  pageBackgroundImage: {
+    opacity: 0.55,
+  },
+  pageBackgroundOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(230, 238, 245, 0.62)',
   },
   page: {
+    alignItems: 'center',
     gap: 18,
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 36,
+  },
+  content: {
+    gap: 18,
+    maxWidth: 1040,
+    width: '100%',
   },
   header: {
     alignItems: 'center',
@@ -88,100 +123,104 @@ export const styles = StyleSheet.create({
   },
   brandBlock: {
     flex: 1,
-    paddingRight: 14,
+    paddingRight: 10,
   },
   brand: {
-    color: '#18201d',
-    fontSize: 34,
+    color: '#122025',
+    fontSize: Platform.OS === 'web' ? 52 : 34,
     fontWeight: '800',
   },
   tagline: {
-    color: '#5e6b64',
-    fontSize: 14,
-    marginTop: 2,
+    color: '#4f6069',
+    fontSize: Platform.OS === 'web' ? 16 : 14,
+    marginTop: Platform.OS === 'web' ? 4 : 2,
   },
   badge: {
-    backgroundColor: '#d8f0c7',
+    backgroundColor: '#e8f3de',
     borderRadius: 6,
-    paddingHorizontal: 10,
+    paddingHorizontal: 11,
     paddingVertical: 6,
   },
   badgeText: {
-    color: '#24532c',
+    color: '#355c2f',
     fontSize: 12,
     fontWeight: '800',
   },
   headerButton: {
-    backgroundColor: '#fffdf8',
-    borderColor: '#dfd8cc',
+    backgroundColor: '#ffffff',
+    borderColor: '#d8dde3',
     borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   headerButtonText: {
-    color: '#20352d',
+    color: '#1f2d34',
     fontSize: 12,
     fontWeight: '800',
   },
   hero: {
-    backgroundColor: '#20352d',
+    backgroundColor: '#113038',
     borderRadius: 8,
     gap: 12,
-    padding: 20,
+    paddingHorizontal: 30,
+    paddingVertical: 32,
   },
   heroTitle: {
-    color: '#fffdf7',
-    fontSize: 28,
+    color: '#f2f7f9',
+    fontSize: Platform.OS === 'web' ? 56 : 28,
     fontWeight: '800',
-    lineHeight: 34,
+    lineHeight: Platform.OS === 'web' ? 62 : 34,
+    maxWidth: 760,
   },
   heroCopy: {
-    color: '#d8e4db',
-    fontSize: 15,
-    lineHeight: 22,
+    color: '#d4e2e6',
+    fontSize: Platform.OS === 'web' ? 18 : 15,
+    lineHeight: Platform.OS === 'web' ? 28 : 22,
+    maxWidth: 840,
   },
   actionRow: {
     flexDirection: 'row',
     gap: 10,
+    width: '100%',
   },
   primaryButton: {
     alignItems: 'center',
-    backgroundColor: '#20352d',
+    backgroundColor: '#153841',
     borderRadius: 8,
     flex: 1,
     justifyContent: 'center',
     minHeight: 48,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 13,
   },
   primaryButtonDisabled: {
     opacity: 0.55,
   },
   primaryButtonText: {
-    color: '#fffdf8',
-    fontSize: 14,
+    color: '#f8fcfe',
+    fontSize: 15,
     fontWeight: '900',
     textAlign: 'center',
   },
   secondaryButton: {
     alignItems: 'center',
-    backgroundColor: '#fffdf8',
-    borderColor: '#dfd8cc',
+    backgroundColor: '#ffffff',
+    borderColor: '#d8dde3',
     borderRadius: 8,
     borderWidth: 1,
     flex: 1,
     justifyContent: 'center',
     minHeight: 48,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 13,
   },
   secondaryButtonDisabled: {
     opacity: 0.6,
   },
   secondaryButtonText: {
-    color: '#20352d',
-    fontSize: 14,
+    color: '#24343a',
+    fontSize: 15,
     fontWeight: '900',
     textAlign: 'center',
   },
@@ -189,8 +228,8 @@ export const styles = StyleSheet.create({
     gap: 12,
   },
   sectionTitle: {
-    color: '#18201d',
-    fontSize: 18,
+    color: '#16242b',
+    fontSize: 20,
     fontWeight: '800',
   },
   optionGrid: {
@@ -199,8 +238,8 @@ export const styles = StyleSheet.create({
     gap: 10,
   },
   option: {
-    backgroundColor: '#fffdf8',
-    borderColor: '#dfd8cc',
+    backgroundColor: '#ffffff',
+    borderColor: '#dbe0e6',
     borderRadius: 8,
     borderWidth: 1,
     minHeight: 88,
@@ -220,13 +259,13 @@ export const styles = StyleSheet.create({
     color: '#174b79',
   },
   optionMeta: {
-    color: '#65736c',
+    color: '#5d6c74',
     fontSize: 12,
     lineHeight: 17,
     marginTop: 6,
   },
   segmentGroup: {
-    backgroundColor: '#e7e1d8',
+    backgroundColor: '#ebeff3',
     borderRadius: 8,
     flexDirection: 'row',
     padding: 4,
@@ -238,49 +277,49 @@ export const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   segmentActive: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#ffffff',
   },
   segmentText: {
-    color: '#68726d',
+    color: '#5e6d75',
     fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
   },
   segmentTextActive: {
-    color: '#18201d',
+    color: '#1d2c33',
   },
   textArea: {
-    backgroundColor: '#fffdf8',
-    borderColor: '#dfd8cc',
+    backgroundColor: '#ffffff',
+    borderColor: '#d8dde3',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#18201d',
+    color: '#1c2d35',
     fontSize: 15,
     minHeight: 104,
     padding: 14,
     textAlignVertical: 'top',
   },
   textInput: {
-    backgroundColor: '#fffdf8',
-    borderColor: '#dfd8cc',
+    backgroundColor: '#ffffff',
+    borderColor: '#d8dde3',
     borderRadius: 8,
     borderWidth: 1,
-    color: '#18201d',
+    color: '#1c2d35',
     fontSize: 15,
     minHeight: 52,
     padding: 14,
   },
   passwordField: {
     alignItems: 'center',
-    backgroundColor: '#fffdf8',
-    borderColor: '#dfd8cc',
+    backgroundColor: '#ffffff',
+    borderColor: '#d8dde3',
     borderRadius: 8,
     borderWidth: 1,
     flexDirection: 'row',
     minHeight: 52,
   },
   passwordInput: {
-    color: '#18201d',
+    color: '#1c2d35',
     flex: 1,
     fontSize: 15,
     padding: 14,
@@ -292,12 +331,12 @@ export const styles = StyleSheet.create({
     width: 52,
   },
   passwordToggleText: {
-    color: '#20352d',
+    color: '#22363f',
     fontSize: 22,
     fontWeight: '900',
   },
   authStatus: {
-    color: '#65736c',
+    color: '#63737b',
     fontSize: 12,
     fontWeight: '800',
     textTransform: 'uppercase',
@@ -319,12 +358,12 @@ export const styles = StyleSheet.create({
     padding: 12,
   },
   summaryPanel: {
-    backgroundColor: '#fffdf8',
-    borderColor: '#dfd8cc',
+    backgroundColor: '#ffffff',
+    borderColor: '#dbe0e6',
     borderRadius: 8,
     borderWidth: 1,
     gap: 10,
-    padding: 16,
+    padding: 20,
   },
   eyebrow: {
     color: '#4879ad',
@@ -333,26 +372,26 @@ export const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   summaryTitle: {
-    color: '#18201d',
-    fontSize: 22,
+    color: '#15242b',
+    fontSize: Platform.OS === 'web' ? 28 : 22,
     fontWeight: '900',
   },
   summaryCopy: {
-    color: '#5d6963',
-    fontSize: 14,
-    lineHeight: 20,
+    color: '#5c6d75',
+    fontSize: 16,
+    lineHeight: 24,
   },
   providerPanel: {
-    backgroundColor: '#fffdf8',
-    borderColor: '#dfd8cc',
+    backgroundColor: '#ffffff',
+    borderColor: '#dbe0e6',
     borderRadius: 8,
     borderWidth: 1,
     gap: 12,
-    padding: 16,
+    padding: 20,
   },
   providerTitle: {
-    color: '#18201d',
-    fontSize: 16,
+    color: '#18272f',
+    fontSize: 18,
     fontWeight: '800',
   },
   providerRow: {
@@ -360,15 +399,17 @@ export const styles = StyleSheet.create({
     gap: 10,
   },
   providerCopy: {
-    color: '#5d6963',
+    color: '#5c6d75',
     fontSize: 13,
     lineHeight: 19,
   },
   moduleCard: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#ffffff',
+    borderColor: '#dbe0e6',
     borderRadius: 8,
+    borderWidth: 1,
     gap: 8,
-    padding: 16,
+    padding: 18,
   },
   moduleNumber: {
     color: '#4879ad',
@@ -376,35 +417,37 @@ export const styles = StyleSheet.create({
     fontWeight: '800',
   },
   moduleTitle: {
-    color: '#18201d',
-    fontSize: 17,
+    color: '#18272f',
+    fontSize: Platform.OS === 'web' ? 22 : 17,
     fontWeight: '800',
   },
   moduleCopy: {
-    color: '#5d6963',
-    fontSize: 13,
-    lineHeight: 19,
+    color: '#5c6d75',
+    fontSize: 15,
+    lineHeight: 23,
   },
   progressTrack: {
-    backgroundColor: '#e5ddd1',
+    backgroundColor: '#dfe5ea',
     borderRadius: 4,
     height: 8,
     overflow: 'hidden',
   },
   progressFill: {
-    backgroundColor: '#77a567',
+    backgroundColor: '#2f8a68',
     height: 8,
   },
   sessionCard: {
     alignItems: 'center',
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#ffffff',
+    borderColor: '#dbe0e6',
     borderRadius: 8,
+    borderWidth: 1,
     flexDirection: 'row',
     gap: 14,
-    padding: 16,
+    padding: 18,
   },
   pulse: {
-    backgroundColor: '#e45f48',
+    backgroundColor: '#1e8f7b',
     borderRadius: 18,
     height: 36,
     width: 36,
@@ -414,14 +457,14 @@ export const styles = StyleSheet.create({
     gap: 4,
   },
   sessionTitle: {
-    color: '#18201d',
-    fontSize: 16,
+    color: '#18272f',
+    fontSize: 20,
     fontWeight: '800',
   },
   sessionMeta: {
-    color: '#65736c',
-    fontSize: 12,
-    lineHeight: 17,
+    color: '#607179',
+    fontSize: 14,
+    lineHeight: 20,
   },
   message: {
     borderRadius: 8,
@@ -429,11 +472,15 @@ export const styles = StyleSheet.create({
     padding: 14,
   },
   tutorMessage: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#ffffff',
+    borderColor: '#dbe0e6',
+    borderWidth: 1,
     marginRight: 26,
   },
   learnerMessage: {
-    backgroundColor: '#dcecf6',
+    backgroundColor: '#dceff8',
+    borderColor: '#c7dfea',
+    borderWidth: 1,
     marginLeft: 26,
   },
   messageRole: {
@@ -443,23 +490,25 @@ export const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   messageText: {
-    color: '#25302c',
-    fontSize: 14,
-    lineHeight: 20,
+    color: '#22343d',
+    fontSize: 15,
+    lineHeight: 22,
   },
   badgeCard: {
-    backgroundColor: '#fffdf8',
+    backgroundColor: '#ffffff',
+    borderColor: '#dbe0e6',
     borderRadius: 8,
+    borderWidth: 1,
     gap: 14,
     padding: 18,
   },
   badgeName: {
-    color: '#18201d',
-    fontSize: 20,
+    color: '#18272f',
+    fontSize: 24,
     fontWeight: '900',
   },
   badgeDescription: {
-    color: '#5d6963',
+    color: '#5c6d75',
     fontSize: 14,
     lineHeight: 20,
   },
@@ -468,8 +517,10 @@ export const styles = StyleSheet.create({
     gap: 10,
   },
   metric: {
-    backgroundColor: '#f1ece3',
+    backgroundColor: '#f1f5f8',
+    borderColor: '#dbe2e8',
     borderRadius: 8,
+    borderWidth: 1,
     flex: 1,
     gap: 5,
     padding: 12,
@@ -482,7 +533,7 @@ export const styles = StyleSheet.create({
   },
   metricValue: {
     color: '#18201d',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '900',
   },
 });

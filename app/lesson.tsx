@@ -23,6 +23,7 @@ import {
 import { shouldRedirectToAuth } from '../src/state/authGuard';
 import { useVaanika } from '../src/state/VaanikaContext';
 import { PrimaryButton, ScreenShell, SecondaryButton, styles } from '../src/ui/VaanikaUI';
+import { WEB_IMAGES } from '../src/web/webImages';
 import type { TutorMessage } from '../src/types/learning';
 
 export default function LessonRoute() {
@@ -241,7 +242,10 @@ export default function LessonRoute() {
   }
 
   return (
-    <ScreenShell homeHref="/dashboard">
+    <ScreenShell
+      homeHref="/dashboard"
+      pageBackgroundUri={WEB_IMAGES.pageBackground}
+    >
       <View style={styles.sessionCard}>
         <View style={styles.pulse} />
         <View style={styles.sessionText}>
