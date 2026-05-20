@@ -15,7 +15,7 @@ export async function getCurrentAuthState(): Promise<AuthSessionState> {
   if (!isSupabaseConfigured || !supabase) {
     return {
       isConfigured: false,
-      userId: 'mock-learner',
+      userId: null,
     };
   }
 
