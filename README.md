@@ -83,7 +83,7 @@ RLS is enabled for all learner-owned tables. Learner rows are scoped to `auth.ui
 
 ## Next Build Steps
 
-1. Add Expo Router or React Navigation for onboarding, course dashboard, tutor session, assessment, and badge screens.
-2. Add Supabase client setup and auth screens.
-3. Replace mock voice providers with server-issued provider session tokens.
-4. Implement adaptive course generation and persistent progress tracking.
+1. Replace mock/mobile-local voice auth paths with server-issued provider session tokens.
+2. Add broader deterministic assessment fail/pass scenario seeding for repeatable CI users.
+3. Expand web/mobile accessibility pass (roles, labels, keyboard navigation, focus states).
+4. Finalize production deployment promotion workflow and fill `docs/web-release-signoff.md` per release.
