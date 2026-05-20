@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useVaanika } from '../src/state/VaanikaContext';
 import { PrimaryButton, ScreenShell, SecondaryButton, styles } from '../src/ui/VaanikaUI';
 import { WebBanner, WebShell, webStyles } from '../src/web/WebShell';
@@ -10,6 +10,8 @@ type AuthFormMode = 'sign_in' | 'sign_up';
 
 export default function AuthRoute() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isCompactWeb = Platform.OS === 'web' && width < 980;
   const { authError, authMode, authNotice, authStatus, signIn, signUp } = useVaanika();
   const [formMode, setFormMode] = useState<AuthFormMode>('sign_in');
   const [email, setEmail] = useState('');
@@ -54,7 +56,7 @@ export default function AuthRoute() {
           title="Your learning account"
           subtitle="Save progress, continue lessons, and keep your assessment history in one place."
         />
-        <View style={webStyles.authGrid}>
+        <View style={[webStyles.authGrid, isCompactWeb && { flexDirection: 'column' }]}>
           <View style={webStyles.authMain}>
             <View style={webStyles.authCard}>
               <Text style={webStyles.sectionLabel}>{authMode === 'mock' ? 'Mock auth' : 'Supabase auth'}</Text>
@@ -87,8 +89,12 @@ export default function AuthRoute() {
                   autoCapitalize="none"
                   keyboardType="email-address"
                   onChangeText={setEmail}
+                  onSubmitEditing={() => {
+                    void submit();
+                  }}
                   placeholder="you@example.com"
                   placeholderTextColor="#7b857f"
+                  returnKeyType="next"
                   style={styles.textInput}
                   value={email}
                 />
@@ -96,8 +102,12 @@ export default function AuthRoute() {
                 <View style={styles.passwordField}>
                   <TextInput
                     onChangeText={setPassword}
+                    onSubmitEditing={() => {
+                      void submit();
+                    }}
                     placeholder="Minimum 6 characters"
                     placeholderTextColor="#7b857f"
+                    returnKeyType="done"
                     secureTextEntry={!isPasswordVisible}
                     style={styles.passwordInput}
                     value={password}
@@ -115,7 +125,7 @@ export default function AuthRoute() {
               {authNotice && <Text style={styles.noticeText}>{authNotice}</Text>}
               {(localError || authError) && <Text style={styles.errorText}>{localError ?? authError}</Text>}
 
-              <View style={styles.actionRow}>
+              <View style={[styles.actionRow, isCompactWeb && { flexDirection: 'column' }]}>
                 <PrimaryButton
                   label={isSubmitting ? 'Working...' : formMode === 'sign_in' ? 'Sign in' : 'Create account'}
                   onPress={() => {
@@ -132,25 +142,27 @@ export default function AuthRoute() {
               </View>
             </View>
           </View>
-          <View style={webStyles.authSide}>
-            <View style={webStyles.sideCard}>
-              <Text style={webStyles.sectionLabel}>Why sign in</Text>
-              <Text style={webStyles.sideTitle}>Continue where you left off</Text>
-              <Text style={webStyles.sideCopy}>
-                Lessons, follow-up history, and assessment attempts are tied to your learner account.
-              </Text>
-              <View style={webStyles.kpiRow}>
-                <View style={webStyles.kpiCard}>
-                  <Text style={webStyles.kpiLabel}>Tutor style</Text>
-                  <Text style={webStyles.kpiValue}>Adaptive</Text>
-                </View>
-                <View style={webStyles.kpiCard}>
-                  <Text style={webStyles.kpiLabel}>Mode</Text>
-                  <Text style={webStyles.kpiValue}>Interactive</Text>
+          {!isCompactWeb ? (
+            <View style={webStyles.authSide}>
+              <View style={webStyles.sideCard}>
+                <Text style={webStyles.sectionLabel}>Why sign in</Text>
+                <Text style={webStyles.sideTitle}>Continue where you left off</Text>
+                <Text style={webStyles.sideCopy}>
+                  Lessons, follow-up history, and assessment attempts are tied to your learner account.
+                </Text>
+                <View style={webStyles.kpiRow}>
+                  <View style={webStyles.kpiCard}>
+                    <Text style={webStyles.kpiLabel}>Tutor style</Text>
+                    <Text style={webStyles.kpiValue}>Adaptive</Text>
+                  </View>
+                  <View style={webStyles.kpiCard}>
+                    <Text style={webStyles.kpiLabel}>Mode</Text>
+                    <Text style={webStyles.kpiValue}>Interactive</Text>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
+          ) : null}
         </View>
       </WebShell>
     );
@@ -193,8 +205,12 @@ export default function AuthRoute() {
           autoCapitalize="none"
           keyboardType="email-address"
           onChangeText={setEmail}
+          onSubmitEditing={() => {
+            void submit();
+          }}
           placeholder="you@example.com"
           placeholderTextColor="#7b857f"
+          returnKeyType="next"
           style={styles.textInput}
           value={email}
         />
@@ -205,8 +221,12 @@ export default function AuthRoute() {
         <View style={styles.passwordField}>
           <TextInput
             onChangeText={setPassword}
+            onSubmitEditing={() => {
+              void submit();
+            }}
             placeholder="Minimum 6 characters"
             placeholderTextColor="#7b857f"
+            returnKeyType="done"
             secureTextEntry={!isPasswordVisible}
             style={styles.passwordInput}
             value={password}

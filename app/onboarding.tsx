@@ -1,5 +1,5 @@
 import { Redirect, useRouter } from 'expo-router';
-import { Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { LANGUAGES, LEARNER_GOALS } from '../src/data/learning';
 import { shouldRedirectToAuth } from '../src/state/authGuard';
 import { useVaanika } from '../src/state/VaanikaContext';
@@ -9,6 +9,8 @@ import { WEB_IMAGES } from '../src/web/webImages';
 
 export default function OnboardingRoute() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isCompactWeb = Platform.OS === 'web' && width < 860;
   const { authStatus, generateCourse, learnerNeed, selectedGoal, selectedLanguage, setLearnerNeed, setSelectedGoal, setSelectedLanguage, userId } =
     useVaanika();
 
@@ -42,7 +44,11 @@ export default function OnboardingRoute() {
               <Pressable
                 key={item.code}
                 onPress={() => setSelectedLanguage(item.code)}
-                style={[styles.option, item.code === selectedLanguage && styles.optionActive]}
+                style={[
+                  styles.option,
+                  isCompactWeb && { width: '100%' },
+                  item.code === selectedLanguage && styles.optionActive,
+                ]}
               >
                 <Text style={[styles.optionTitle, item.code === selectedLanguage && styles.optionTitleActive]}>
                   {item.name}

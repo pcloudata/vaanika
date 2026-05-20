@@ -19,12 +19,44 @@ export async function getCurrentAuthState(): Promise<AuthSessionState> {
     };
   }
 
-  const { data } = await supabase.auth.getSession();
+  try {
+    const { data, error } = await supabase.auth.getSession();
 
-  return {
-    isConfigured: true,
-    userId: data.session?.user.id ?? null,
-  };
+    if (error) {
+      if (isInvalidRefreshTokenError(error)) {
+        await supabase.auth.signOut({ scope: 'local' });
+        return {
+          isConfigured: true,
+          userId: null,
+        };
+      }
+      throw error;
+    }
+
+    return {
+      isConfigured: true,
+      userId: data.session?.user.id ?? null,
+    };
+  } catch (error) {
+    if (isInvalidRefreshTokenError(error)) {
+      await supabase.auth.signOut({ scope: 'local' });
+      return {
+        isConfigured: true,
+        userId: null,
+      };
+    }
+
+    throw error;
+  }
+}
+
+function isInvalidRefreshTokenError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+  return message.includes('invalid refresh token') || message.includes('refresh token not found');
 }
 
 export async function signInWithEmail({ email, password }: AuthCredentials): Promise<AuthSessionState> {

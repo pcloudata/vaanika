@@ -1,5 +1,5 @@
 import { Redirect, useRouter } from 'expo-router';
-import { Platform, Text, View } from 'react-native';
+import { Platform, Text, View, useWindowDimensions } from 'react-native';
 import { COURSE_MODULES } from '../src/data/learning';
 import { shouldRedirectToAuth } from '../src/state/authGuard';
 import { useVaanika } from '../src/state/VaanikaContext';
@@ -9,6 +9,8 @@ import { WEB_IMAGES } from '../src/web/webImages';
 
 export default function DashboardRoute() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isCompactWeb = Platform.OS === 'web' && width < 980;
   const {
     courseProgress,
     dataStatus,
@@ -31,7 +33,7 @@ export default function DashboardRoute() {
   if (Platform.OS === 'web') {
     return (
       <WebShell
-        homeHref="/"
+        homeHref="/dashboard"
         pageBackgroundUri={WEB_IMAGES.pageBackground}
       >
         <WebBanner
@@ -39,7 +41,7 @@ export default function DashboardRoute() {
           title={`${language.name} conversation track`}
           subtitle="Tutor-led modules with interruption handling, progress tracking, and assessment readiness."
         />
-        <View style={webStyles.dashboardGrid}>
+        <View style={[webStyles.dashboardGrid, isCompactWeb && { flexDirection: 'column' }]}>
           <View style={webStyles.dashboardPrimary}>
             <View style={styles.summaryPanel}>
               <Text style={styles.eyebrow}>{language.name} adaptive course</Text>
@@ -52,7 +54,7 @@ export default function DashboardRoute() {
               </View>
               <Text style={styles.optionMeta}>{courseProgress} complete</Text>
             </View>
-            <View style={webStyles.kpiRow}>
+            <View style={[webStyles.kpiRow, isCompactWeb && { flexDirection: 'column' }]}>
               <View style={webStyles.kpiCard}>
                 <Text style={webStyles.kpiLabel}>Active language</Text>
                 <Text style={webStyles.kpiValue}>{language.name}</Text>
@@ -63,7 +65,7 @@ export default function DashboardRoute() {
               </View>
             </View>
 
-            <View style={styles.actionRow}>
+            <View style={[styles.actionRow, isCompactWeb && { flexDirection: 'column' }]}>
               <PrimaryButton
                 label="Start lesson"
                 onPress={() => {
@@ -73,7 +75,7 @@ export default function DashboardRoute() {
               />
               <SecondaryButton label="Assessment" onPress={() => router.push('/assessment')} />
             </View>
-            <View style={styles.actionRow}>
+            <View style={[styles.actionRow, isCompactWeb && { flexDirection: 'column' }]}>
               <SecondaryButton label="Edit onboarding" onPress={() => router.push('/onboarding')} />
               <SecondaryButton
                 label="Sign out"
@@ -88,7 +90,7 @@ export default function DashboardRoute() {
           <View style={webStyles.dashboardSecondary}>
             <View style={styles.providerPanel}>
               <Text style={styles.providerTitle}>{language.name} provider route</Text>
-              <View style={styles.providerRow}>
+              <View style={[styles.providerRow, isCompactWeb && { flexDirection: 'column' }]}>
                 <Metric label="Voice" value={runtimeProviders.voice.name} />
                 <Metric label="Tutor brain" value={runtimeProviders.tutorBrain.name} />
               </View>
@@ -115,7 +117,7 @@ export default function DashboardRoute() {
   }
 
   return (
-    <ScreenShell homeHref="/">
+    <ScreenShell homeHref="/dashboard">
       <View style={styles.summaryPanel}>
         <Text style={styles.eyebrow}>{language.name} adaptive course</Text>
         <Text style={styles.summaryTitle}>{selectedGoal} practice</Text>

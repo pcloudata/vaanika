@@ -1,6 +1,6 @@
 import { Redirect, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { RecordingPresets, useAudioRecorder } from 'expo-audio';
 import { Mic, Square } from 'lucide-react-native';
 import {
@@ -46,6 +46,8 @@ export default function LessonRoute() {
   const supportsInterruptions = true;
   const transcript = lessonTurns;
   const isWeb = Platform.OS === 'web';
+  const { width } = useWindowDimensions();
+  const isCompactWeb = isWeb && width < 900;
   const introLine = useMemo(() => buildStepGuidance(currentStep, language.name), [currentStep, language.name]);
   const voiceStatus = useMemo(() => {
     if (isWeb) {
@@ -280,7 +282,7 @@ export default function LessonRoute() {
         ))}
       </View>
 
-      <View style={styles.actionRow}>
+      <View style={[styles.actionRow, isCompactWeb && { flexDirection: 'column' }]}>
         <SecondaryButton
           label={isWeb ? 'Start lesson' : isTutorSpeaking ? 'Stop tutor audio' : 'Start tutor audio'}
           disabled={busy}

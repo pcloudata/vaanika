@@ -1,5 +1,6 @@
 import { Link, type Href } from 'expo-router';
 import type { ReactNode } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -10,13 +11,15 @@ type WebShellProps = {
 };
 
 export function WebShell({ children, homeHref, pageBackgroundUri }: WebShellProps) {
+  const { width } = useWindowDimensions();
+  const isCompactWeb = width < 920;
   const pageBody = (
-    <ScrollView contentContainerStyle={styles.page}>
-      <View style={styles.content}>
-        <View style={styles.header}>
+    <ScrollView contentContainerStyle={[styles.page, isCompactWeb && styles.pageCompact]}>
+      <View style={[styles.content, isCompactWeb && styles.contentCompact]}>
+        <View style={[styles.header, isCompactWeb && styles.headerCompact]}>
           <View style={styles.brandBlock}>
-            <Text style={styles.brand}>Vaanika</Text>
-            <Text style={styles.tagline}>Your AI language tutor, anytime.</Text>
+            <Text style={[styles.brand, isCompactWeb && styles.brandCompact]}>Vaanika</Text>
+            <Text style={[styles.tagline, isCompactWeb && styles.taglineCompact]}>Your AI language tutor, anytime.</Text>
           </View>
           {homeHref ? (
             <Link href={homeHref} asChild>
@@ -24,11 +27,7 @@ export function WebShell({ children, homeHref, pageBackgroundUri }: WebShellProp
                 <Text style={styles.homeButtonText}>Home</Text>
               </Pressable>
             </Link>
-          ) : (
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusBadgeText}>MVP</Text>
-            </View>
-          )}
+          ) : null}
         </View>
         {children}
       </View>
@@ -305,38 +304,44 @@ const styles = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 28,
   },
+  pageCompact: {
+    paddingHorizontal: 14,
+    paddingVertical: 16,
+  },
   content: {
     width: '100%',
     maxWidth: 1180,
     gap: 22,
+  },
+  contentCompact: {
+    gap: 14,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  headerCompact: {
+    alignItems: 'flex-start',
+  },
   brandBlock: {
     gap: 4,
+    flex: 1,
   },
   brand: {
     color: '#122025',
     fontSize: 56,
     fontWeight: '800',
   },
+  brandCompact: {
+    fontSize: 34,
+  },
   tagline: {
     color: '#50626a',
     fontSize: 18,
   },
-  statusBadge: {
-    backgroundColor: '#e6f3dc',
-    borderRadius: 7,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  statusBadgeText: {
-    color: '#365f31',
-    fontSize: 12,
-    fontWeight: '800',
+  taglineCompact: {
+    fontSize: 14,
   },
   homeButton: {
     backgroundColor: '#ffffff',
