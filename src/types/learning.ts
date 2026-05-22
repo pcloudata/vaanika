@@ -1,4 +1,4 @@
-export type LanguageCode = 'es-ES' | 'en-US' | 'fr-FR' | 'ta-IN';
+export type LanguageCode = 'es-ES' | 'en-US' | 'fr-FR' | 'ta-IN' | 'te-IN';
 export type LearningGoal = 'Conversation' | 'Travel' | 'Work';
 
 export type LearningLanguage = {
@@ -16,6 +16,14 @@ export type CourseModule = {
 export type TutorMessage = {
   role: 'tutor' | 'learner';
   text: string;
+};
+
+export type LessonPhase = 'TEACH' | 'EXAMPLE' | 'PRACTICE' | 'RUBRIC_CHECK';
+
+export type InterruptionSnapshot = {
+  phase: LessonPhase;
+  stepId: string;
+  stepIndex: number;
 };
 
 export type VoiceProviderName = 'OpenAI Realtime' | 'Grok Voice' | 'Sarvam';
@@ -61,4 +69,9 @@ export type AssessmentResponses = Record<AssessmentDimension, string>;
 export type AssessmentSubscores = Record<AssessmentDimension, number> & {
   notes: string;
   overall: number;
+};
+
+export type DisplayText = {
+  native: string;
+  transliteration?: string;
 };

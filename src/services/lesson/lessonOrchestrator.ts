@@ -1,15 +1,17 @@
-import type { LanguageCode } from '../../types/learning';
+import type { DisplayText, LanguageCode, LessonPhase } from '../../types/learning';
 
 export type LessonStep = {
   id: string;
   title: string;
-  teachLine: string;
-  practicePrompt: string;
+  teachLine: DisplayText;
+  exampleLine: DisplayText;
+  practicePrompt: DisplayText;
   expectedKeywords: string[];
 };
 
 export type LessonPlan = {
   title: string;
+  moduleTitle?: string;
   steps: LessonStep[];
 };
 
@@ -18,26 +20,35 @@ export type PracticeEvaluation = {
   passed: boolean;
 };
 
-export function getLessonPlan(languageCode: LanguageCode): LessonPlan {
+export type LessonRuntimeState = {
+  activePhase: LessonPhase;
+  activeStepId: string;
+  stepIndex: number;
+};
+
+type RegionalModule = {
+  title: string;
+  steps: LessonStep[];
+};
+
+export function getLessonPlan(languageCode: LanguageCode, moduleIndex = 0): LessonPlan {
   if (languageCode === 'ta-IN') {
+    const modules = buildRegionalDailyLifeModules('ta-IN');
+    const active = modules[Math.max(0, Math.min(moduleIndex, modules.length - 1))];
     return {
-      title: 'Tamil Conversation Basics',
-      steps: [
-        {
-          id: 'intro-name',
-          title: 'Self-introduction',
-          teachLine: 'Today we practice introducing yourself politely in Tamil.',
-          practicePrompt: 'Say: Hello, what is your name?',
-          expectedKeywords: ['vanakkam', 'peyar', 'enna'],
-        },
-        {
-          id: 'dinner-check',
-          title: 'Daily conversation',
-          teachLine: 'Now we practice asking if someone finished dinner.',
-          practicePrompt: 'Say: Did you finish your dinner?',
-          expectedKeywords: ['iravu', 'unavu', 'mudith'],
-        },
-      ],
+      title: 'Tamil Guided Tutorial',
+      moduleTitle: active.title,
+      steps: active.steps,
+    };
+  }
+
+  if (languageCode === 'te-IN') {
+    const modules = buildRegionalDailyLifeModules('te-IN');
+    const active = modules[Math.max(0, Math.min(moduleIndex, modules.length - 1))];
+    return {
+      title: 'Telugu Guided Tutorial',
+      moduleTitle: active.title,
+      steps: active.steps,
     };
   }
 
@@ -48,15 +59,17 @@ export function getLessonPlan(languageCode: LanguageCode): LessonPlan {
         {
           id: 'intro-name',
           title: 'Self-introduction',
-          teachLine: 'Today we practice greeting and asking someone their name.',
-          practicePrompt: 'Say: Hello, what is your name?',
+          teachLine: { native: 'Today we practice greeting and asking someone their name.' },
+          exampleLine: { native: 'Spanish: "Hola, como te llamas?"' },
+          practicePrompt: { native: 'Say in Spanish: Hello, what is your name?' },
           expectedKeywords: ['hola', 'como', 'llamas'],
         },
         {
           id: 'dinner-check',
           title: 'Daily conversation',
-          teachLine: 'Now we practice asking if someone finished dinner.',
-          practicePrompt: 'Say: Did you finish your dinner?',
+          teachLine: { native: 'Now we practice asking if someone finished dinner.' },
+          exampleLine: { native: 'Spanish: "Terminaste la cena?"' },
+          practicePrompt: { native: 'Say in Spanish: Did you finish your dinner?' },
           expectedKeywords: ['terminaste', 'cena'],
         },
       ],
@@ -70,15 +83,17 @@ export function getLessonPlan(languageCode: LanguageCode): LessonPlan {
         {
           id: 'intro-name',
           title: 'Self-introduction',
-          teachLine: 'Today we practice greeting and asking someone their name.',
-          practicePrompt: 'Say: Hello, what is your name?',
+          teachLine: { native: 'Today we practice greeting and asking someone their name.' },
+          exampleLine: { native: 'French: "Bonjour, comment tu t appelles ?"' },
+          practicePrompt: { native: 'Say in French: Hello, what is your name?' },
           expectedKeywords: ['bonjour', 'comment', 'appelles'],
         },
         {
           id: 'dinner-check',
           title: 'Daily conversation',
-          teachLine: 'Now we practice asking if someone finished dinner.',
-          practicePrompt: 'Say: Did you finish your dinner?',
+          teachLine: { native: 'Now we practice asking if someone finished dinner.' },
+          exampleLine: { native: 'French: "Tu as fini le diner ?"' },
+          practicePrompt: { native: 'Say in French: Did you finish your dinner?' },
           expectedKeywords: ['as', 'fini', 'diner'],
         },
       ],
@@ -91,15 +106,17 @@ export function getLessonPlan(languageCode: LanguageCode): LessonPlan {
       {
         id: 'intro-name',
         title: 'Self-introduction',
-        teachLine: 'Today we practice simple introductions.',
-        practicePrompt: 'Say: Hello, what is your name?',
+        teachLine: { native: 'Today we practice simple introductions.' },
+        exampleLine: { native: 'English: "Hello, what is your name?"' },
+        practicePrompt: { native: 'Say: Hello, what is your name?' },
         expectedKeywords: ['hello', 'name'],
       },
       {
         id: 'dinner-check',
         title: 'Daily conversation',
-        teachLine: 'Now we practice asking a daily routine question.',
-        practicePrompt: 'Say: Did you finish your dinner?',
+        teachLine: { native: 'Now we practice asking a daily routine question.' },
+        exampleLine: { native: 'English: "Did you finish your dinner?"' },
+        practicePrompt: { native: 'Say: Did you finish your dinner?' },
         expectedKeywords: ['finish', 'dinner'],
       },
     ],
@@ -107,7 +124,181 @@ export function getLessonPlan(languageCode: LanguageCode): LessonPlan {
 }
 
 export function buildStepGuidance(step: LessonStep, languageName: string): string {
-  return `${step.teachLine} In ${languageName}, practice now: ${step.practicePrompt}`;
+  return `${step.teachLine.native} Example: ${step.exampleLine.native} In ${languageName}, practice now: ${step.practicePrompt.native}`;
+}
+
+function buildRegionalDailyLifeModules(languageCode: 'ta-IN' | 'te-IN'): RegionalModule[] {
+  const languageLabel = languageCode === 'ta-IN' ? 'Tamil' : 'Telugu';
+  const phraseSet =
+    languageCode === 'ta-IN'
+      ? {
+          greeting: { native: 'வணக்கம்', translit: 'Vanakkam' },
+          nameQuestion: { native: 'உங்கள் பெயர் என்ன?', translit: 'Ungal peyar enna?' },
+          thanks: { native: 'Nandri', translit: 'Nandri' },
+        }
+      : {
+          greeting: { native: 'నమస్కారం', translit: 'Namaskaram' },
+          nameQuestion: { native: 'మీ పేరు ఏమిటి?', translit: 'Mee peru emiti?' },
+          thanks: { native: 'ధన్యవాదాలు', translit: 'Dhanyavaadalu' },
+        };
+
+  const buildModuleSteps = (
+    moduleSlug: string,
+    moduleTitle: string,
+    prompts: Array<{ prompt: string; keywords: string[] }>,
+  ): LessonStep[] =>
+    prompts.map((entry, idx) => ({
+      id: `${moduleSlug}-${idx + 1}`,
+      title: moduleTitle,
+      teachLine: {
+        native: idx < 5 ? `Class teaching point: ${entry.prompt}` : `Practice checkpoint: ${entry.prompt}`,
+      },
+      exampleLine: {
+        native:
+          idx % 2 === 0
+            ? `${languageLabel}: "${phraseSet.greeting.native}, ${phraseSet.nameQuestion.native}"`
+            : `${languageLabel}: "${phraseSet.thanks.native}"`,
+        transliteration:
+          idx % 2 === 0
+            ? `${phraseSet.greeting.translit}, ${phraseSet.nameQuestion.translit}`
+            : phraseSet.thanks.translit,
+      },
+      practicePrompt: {
+        native: `Say in ${languageLabel}: ${entry.prompt}`,
+        transliteration: entry.prompt,
+      },
+      expectedKeywords: entry.keywords,
+    }));
+
+  const greetingsPrompts = [
+    { prompt: 'Hello, what is your name?', keywords: ['name', 'peru', 'peyar', 'enna', 'emiti'] },
+    { prompt: 'My name is Prashanth.', keywords: ['my name', 'naa peru', 'en peyar'] },
+    { prompt: 'Nice to meet you.', keywords: ['meet', 'santhosham', 'magizhchi'] },
+    { prompt: 'Where are you from?', keywords: ['from', 'enga', 'ekkada'] },
+    { prompt: 'I am from Hyderabad.', keywords: ['from', 'hyderabad'] },
+    { prompt: 'Can you repeat your name?', keywords: ['repeat', 'malli', 'thirumba'] },
+    { prompt: 'Please speak slowly.', keywords: ['slowly', 'mellaga', 'medhuva'] },
+    { prompt: 'I am learning Telugu/Tamil.', keywords: ['learning', 'nerchukuntunna', 'kathukkiren'] },
+    { prompt: 'Thank you for helping me.', keywords: ['thank', 'dhany', 'nandri'] },
+    { prompt: 'See you tomorrow.', keywords: ['tomorrow', 'repu', 'naalai'] },
+    { prompt: 'Good morning, teacher.', keywords: ['morning', 'good', 'teacher'] },
+    { prompt: 'Good evening, friend.', keywords: ['evening', 'friend'] },
+    { prompt: 'What should I practice today?', keywords: ['practice', 'today'] },
+    { prompt: 'I understand this sentence.', keywords: ['understand', 'ardham', 'puriyuthu'] },
+    { prompt: 'I need one more example.', keywords: ['example', 'inka', 'innum'] },
+  ];
+
+  const homePrompts = [
+    { prompt: 'Did you finish your dinner?', keywords: ['dinner', 'bhojanam', 'unavu'] },
+    { prompt: 'What time is dinner?', keywords: ['time', 'samayam', 'neram'] },
+    { prompt: 'I am at home now.', keywords: ['home', 'illu', 'veedu'] },
+    { prompt: 'Please give me water.', keywords: ['water', 'neellu', 'thanni'] },
+    { prompt: 'I am hungry now.', keywords: ['hungry', 'akali', 'pasikkuthu'] },
+    { prompt: 'This food is tasty.', keywords: ['food', 'ruchi', 'suvai'] },
+    { prompt: 'Can I get tea?', keywords: ['tea', 'chai'] },
+    { prompt: 'Please sit here.', keywords: ['sit', 'ikkada', 'inge'] },
+    { prompt: 'I will come in five minutes.', keywords: ['five', 'minutes'] },
+    { prompt: 'Where is the kitchen?', keywords: ['kitchen'] },
+    { prompt: 'Open the door please.', keywords: ['door', 'open'] },
+    { prompt: 'Close the window please.', keywords: ['window', 'close'] },
+    { prompt: 'I am cleaning the table.', keywords: ['table', 'clean'] },
+    { prompt: 'Let us eat together.', keywords: ['eat', 'kalisi', 'serndhu'] },
+    { prompt: 'Dinner is ready now.', keywords: ['ready', 'dinner'] },
+  ];
+
+  const directionPrompts = [
+    { prompt: 'Where is the bus stop?', keywords: ['bus', 'stop', 'ekkada', 'enge'] },
+    { prompt: 'Is it on the left side?', keywords: ['left', 'side'] },
+    { prompt: 'Please turn right.', keywords: ['right', 'turn'] },
+    { prompt: 'Go straight for two blocks.', keywords: ['straight', 'two', 'blocks'] },
+    { prompt: 'Can you show me on map?', keywords: ['show', 'map'] },
+    { prompt: 'I did not understand. Repeat please.', keywords: ['understand', 'repeat'] },
+    { prompt: 'Speak a little slower.', keywords: ['slower', 'slowly'] },
+    { prompt: 'How far is the station?', keywords: ['far', 'station'] },
+    { prompt: 'I need help with directions.', keywords: ['help', 'directions'] },
+    { prompt: 'Is this the correct road?', keywords: ['correct', 'road'] },
+    { prompt: 'Thank you for your help.', keywords: ['thank', 'help'] },
+    { prompt: 'Can you say that again?', keywords: ['again', 'say'] },
+    { prompt: 'I will ask someone else too.', keywords: ['ask', 'someone'] },
+    { prompt: 'I found the place.', keywords: ['found', 'place'] },
+    { prompt: 'Goodbye, have a nice day.', keywords: ['goodbye', 'day'] },
+  ];
+
+  return [
+    { title: 'Greetings + Identity', steps: buildModuleSteps('greet', 'Greetings + Identity', greetingsPrompts) },
+    { title: 'Home, Food, Time', steps: buildModuleSteps('home', 'Home, Food, Time', homePrompts) },
+    {
+      title: 'Directions, Requests, Recovery',
+      steps: buildModuleSteps('direction', 'Directions, Requests, Recovery', directionPrompts),
+    },
+  ];
+}
+
+export function buildPhasePrompt(
+  step: LessonStep,
+  phase: LessonPhase,
+  languageName: string,
+): string {
+  if (phase === 'TEACH') {
+    return step.teachLine.native;
+  }
+  if (phase === 'EXAMPLE') {
+    return step.exampleLine.transliteration
+      ? `${step.exampleLine.native} (${step.exampleLine.transliteration})`
+      : step.exampleLine.native;
+  }
+  if (phase === 'PRACTICE') {
+    return step.practicePrompt.transliteration
+      ? `${step.practicePrompt.native} (${step.practicePrompt.transliteration})`
+      : step.practicePrompt.native;
+  }
+  return `Evaluating your response for this ${languageName} step now.`;
+}
+
+export function transitionAfterPracticeEvaluation(
+  current: LessonRuntimeState,
+  evaluationPassed: boolean,
+  totalSteps: number,
+  nextStepId: string | null,
+): LessonRuntimeState {
+  if (!evaluationPassed) {
+    return {
+      ...current,
+      activePhase: 'PRACTICE',
+    };
+  }
+
+  const isLastStep = current.stepIndex >= totalSteps - 1;
+  if (isLastStep || !nextStepId) {
+    return {
+      ...current,
+      activePhase: 'RUBRIC_CHECK',
+    };
+  }
+
+  return {
+    // We emit teach+example+practice messages immediately for the next step,
+    // so learner input should be accepted right away in PRACTICE phase.
+    activePhase: 'PRACTICE',
+    activeStepId: nextStepId,
+    stepIndex: current.stepIndex + 1,
+  };
+}
+
+export function restoreFromInterruption(snapshot: {
+  phase: LessonPhase;
+  stepId: string;
+  stepIndex: number;
+}): LessonRuntimeState {
+  return {
+    activePhase: snapshot.phase,
+    activeStepId: snapshot.stepId,
+    stepIndex: snapshot.stepIndex,
+  };
+}
+
+export function canHandleFollowUp(currentStepFollowUpCount: number, maxPerStep = 2): boolean {
+  return currentStepFollowUpCount < maxPerStep;
 }
 
 export async function evaluatePracticeResponse(
@@ -142,7 +333,7 @@ export async function evaluatePracticeResponse(
         },
         {
           role: 'user',
-          content: `Language code: ${languageCode}. Exercise: ${step.practicePrompt}. Expected keywords: ${step.expectedKeywords.join(
+          content: `Language code: ${languageCode}. Exercise: ${step.practicePrompt.native}. Expected keywords: ${step.expectedKeywords.join(
             ', ',
           )}. Learner said: ${learnerText}`,
         },
@@ -243,28 +434,26 @@ function fallbackEvaluation(learnerText: string, step: LessonStep): PracticeEval
 }
 
 function matchesStepIntent(normalizedText: string, step: LessonStep, languageCode: LanguageCode): boolean {
-  if (step.id === 'intro-name') {
-    if (languageCode === 'ta-IN') {
-      return (
-        normalizedText.includes('name') ||
-        normalizedText.includes('peyar') ||
-        normalizedText.includes('enna') ||
-        normalizedText.includes('your name')
-      );
-    }
-    return normalizedText.includes('name') || normalizedText.includes('your name');
+  const keywordHits = step.expectedKeywords.filter((keyword) =>
+    normalizedText.includes(keyword.toLowerCase()),
+  ).length;
+  if (keywordHits >= 1) {
+    return true;
   }
 
-  if (step.id === 'dinner-check') {
-    if (languageCode === 'ta-IN') {
-      return (
-        normalizedText.includes('dinner') ||
-        normalizedText.includes('iravu') ||
-        normalizedText.includes('unavu') ||
-        normalizedText.includes('saapadu')
-      );
-    }
-    return normalizedText.includes('dinner') || normalizedText.includes('finish');
+  if (languageCode === 'te-IN') {
+    return (
+      normalizedText.includes('పేరు') ||
+      normalizedText.includes('ఏమిటి') ||
+      normalizedText.includes('మీ పేరు') ||
+      normalizedText.includes('భోజనం') ||
+      normalizedText.includes('ముగించారా') ||
+      normalizedText.includes('నమస్కారం')
+    );
+  }
+
+  if (languageCode === 'ta-IN') {
+    return normalizedText.includes('வணக்கம்') || normalizedText.includes('சாப்பாடு') || normalizedText.includes('என்ன');
   }
 
   return false;
@@ -276,18 +465,20 @@ function evaluateWithHeuristics(
   languageCode: LanguageCode,
 ): PracticeEvaluation | null {
   const normalized = learnerText.trim().toLowerCase();
+  const keywordHits = step.expectedKeywords.filter((keyword) =>
+    normalized.includes(keyword.toLowerCase()),
+  ).length;
+  if (keywordHits >= Math.max(1, Math.ceil(step.expectedKeywords.length / 2))) {
+    return {
+      passed: true,
+      feedback: 'Strong response. Correct meaning and key phrase use. Let us continue to the next step.',
+    };
+  }
 
-  if (languageCode === 'ta-IN' && step.id === 'intro-name') {
+  if (languageCode === 'ta-IN') {
     const hasTamilGreeting =
       normalized.includes('vanakkam') || normalized.includes('வணக்கம்') || normalized.includes('greetings') || normalized.includes('hello');
-    const hasNameIntent =
-      normalized.includes('name') ||
-      normalized.includes('peyar') ||
-      normalized.includes('per') ||
-      normalized.includes('enna') ||
-      normalized.includes('what is your name');
-
-    if (hasTamilGreeting && hasNameIntent) {
+    if (hasTamilGreeting) {
       return {
         passed: true,
         feedback: 'Great meaning. Next time add more Tamil words: "Vanakkam, ungal peyar enna?"',
@@ -295,19 +486,16 @@ function evaluateWithHeuristics(
     }
   }
 
-  if (languageCode === 'ta-IN' && step.id === 'dinner-check') {
-    const hasDinnerIntent =
-      normalized.includes('dinner') ||
-      normalized.includes('iravu unavu') ||
-      normalized.includes('saapadu') ||
-      normalized.includes('சாப்பாடு');
-    const hasFinishIntent =
-      normalized.includes('finish') || normalized.includes('mudich') || normalized.includes('mudith');
-
-    if (hasDinnerIntent && hasFinishIntent) {
+  if (languageCode === 'te-IN') {
+    const hasTeluguIntent =
+      normalized.includes('నమస్కారం') ||
+      normalized.includes('మీ పేరు') ||
+      normalized.includes('భోజనం') ||
+      normalized.includes('ముగించారా');
+    if (hasTeluguIntent) {
       return {
         passed: true,
-        feedback: 'Good intent and structure. Try the full Tamil phrase once for fluency.',
+        feedback: 'Good Telugu usage. Keep the same structure and speak at a natural pace.',
       };
     }
   }

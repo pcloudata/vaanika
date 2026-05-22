@@ -315,7 +315,7 @@ function deterministicFallback(
     ),
   );
 
-  const base = languageCode === 'ta-IN' ? lengthScore + 2 : lengthScore;
+  const base = languageCode === 'ta-IN' || languageCode === 'te-IN' ? lengthScore + 2 : lengthScore;
   const speaking = clamp(base, 40, 95);
   const listening = clamp(base - 4, 35, 92);
   const vocabulary = clamp(base - 2, 35, 93);
@@ -434,6 +434,9 @@ async function ensureBadgeForLanguage(languageCode: LanguageCode, badgeTitle: st
 function getBadgeTitle(languageCode: LanguageCode): string {
   if (languageCode === 'ta-IN') {
     return 'Tamil Conversation Basics';
+  }
+  if (languageCode === 'te-IN') {
+    return 'Telugu Conversation Basics';
   }
 
   if (languageCode === 'es-ES') {

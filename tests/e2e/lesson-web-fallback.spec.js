@@ -18,6 +18,7 @@ test.describe('web lesson fallback', () => {
     await page.getByPlaceholder('Type your response or follow-up question...').fill(learnerPrompt);
     await clickVisibleByText(page, 'Send response');
     await expect(page.getByText(learnerPrompt)).toBeVisible();
+    await expect(page.getByText(/Back to class step/)).toBeVisible();
     await expect(page.getByPlaceholder('Type your response or follow-up question...')).toHaveValue('');
     await expect(page.getByText(/Voice follow-ups captured:\s+\d+/)).toBeVisible();
   });

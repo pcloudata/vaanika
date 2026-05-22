@@ -18,22 +18,32 @@ describe('assessment gate', () => {
   });
 
   it('allows assessment when lesson is completed', () => {
-    expect(canSubmitAssessmentFromProgress('complete', [])).toBe(true);
-  });
-
-  it('allows assessment when module progress already reached 100%', () => {
     expect(
-      canSubmitAssessmentFromProgress('not_started', [
+      canSubmitAssessmentFromProgress('complete', [
         { title: 'M1', description: 'd', progress: '100%' },
+        { title: 'M2', description: 'd', progress: '100%' },
+        { title: 'M3', description: 'd', progress: '100%' },
       ]),
     ).toBe(true);
   });
 
-  it('returns explicit block reason when no lesson/module completion exists', () => {
+  it('allows assessment when 3 module progress entries reached 100%', () => {
+    expect(
+      canSubmitAssessmentFromProgress('not_started', [
+        { title: 'M1', description: 'd', progress: '100%' },
+        { title: 'M2', description: 'd', progress: '100%' },
+        { title: 'M3', description: 'd', progress: '100%' },
+      ]),
+    ).toBe(true);
+  });
+
+  it('blocks when fewer than 3 modules are complete', () => {
     const eligibility = getAssessmentEligibilityFromProgress('not_started', [
-      { title: 'M1', description: 'd', progress: '25%' },
+      { title: 'M1', description: 'd', progress: '100%' },
+      { title: 'M2', description: 'd', progress: '25%' },
+      { title: 'M3', description: 'd', progress: '25%' },
     ]);
     expect(eligibility.allowed).toBe(false);
-    expect(eligibility.reason).toContain('Complete at least one module');
+    expect(eligibility.reason).toContain('Complete all 3 modules');
   });
 });

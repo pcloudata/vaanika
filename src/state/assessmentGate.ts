@@ -24,21 +24,19 @@ export function getAssessmentEligibilityFromProgress(
     };
   }
 
-  if (lessonStatus === 'complete') {
+  const completedModules = modules?.reduce((count, module) => {
+      const value = Number.parseInt(module.progress.replace('%', ''), 10);
+      return !Number.isNaN(value) && value >= 100 ? count + 1 : count;
+    }, 0) ?? 0;
+
+  if (lessonStatus === 'complete' && completedModules >= 3) {
     return { allowed: true, reason: null };
   }
 
-  const hasCompletedModule = Boolean(
-    modules?.some((module) => {
-      const value = Number.parseInt(module.progress.replace('%', ''), 10);
-      return !Number.isNaN(value) && value >= 100;
-    }),
-  );
-
-  if (!hasCompletedModule) {
+  if (completedModules < 3) {
     return {
       allowed: false,
-      reason: 'Complete at least one module or one full lesson before assessment.',
+      reason: 'Complete all 3 modules before submitting the assessment.',
     };
   }
 

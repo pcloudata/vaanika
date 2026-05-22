@@ -1,5 +1,7 @@
 import { isSupabaseConfigured, supabase } from '../../backend/supabaseClient';
 
+import type { LessonPhase } from '../../types/learning';
+
 export type StepEventType = 'practice_pass' | 'practice_retry' | 'followup' | 'unclear';
 
 type RecordStepEventParams = {
@@ -7,6 +9,7 @@ type RecordStepEventParams = {
   stepId: string;
   stepIndex: number;
   eventType: StepEventType;
+  activePhase?: LessonPhase;
   learnerText: string;
   tutorText: string;
 };
@@ -32,5 +35,6 @@ export function buildLessonStepEventInsert(params: RecordStepEventParams) {
     step_id: params.stepId,
     step_index: params.stepIndex,
     tutor_text: params.tutorText,
+    active_phase: params.activePhase ?? null,
   };
 }

@@ -11,11 +11,11 @@ const TAMIL_LANGUAGE_PLAN: ProviderPlan = {
   voiceProvider: 'Sarvam',
   tutorBrainProvider: 'OpenAI',
   rationale:
-    'Use Sarvam for Tamil speech recognition and synthesis experiments while keeping lesson reasoning and scoring provider-independent.',
+    'Use Sarvam for regional Indian speech recognition and synthesis while keeping lesson reasoning and scoring provider-independent.',
 };
 
 export function getProviderPlan(languageCode: LanguageCode): ProviderPlan {
-  if (languageCode === 'ta-IN') {
+  if (languageCode === 'ta-IN' || languageCode === 'te-IN') {
     return TAMIL_LANGUAGE_PLAN;
   }
 

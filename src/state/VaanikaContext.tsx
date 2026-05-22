@@ -21,7 +21,9 @@ import { getAssessmentEligibilityFromProgress, type LessonStatus } from './asses
 import type {
   AssessmentResponses,
   AssessmentSubscores,
+  InterruptionSnapshot,
   LanguageCode,
+  LessonPhase,
   LearnerProfile,
   LearningGoal,
   LearningLanguage,
@@ -47,6 +49,11 @@ type VaanikaState = {
   learnerProfile: LearnerProfile | null;
   learnerNeed: string;
   lessonStatus: LessonStatus;
+  lessonRuntime: {
+    activePhase: LessonPhase;
+    activeStepId: string | null;
+    interruptionSnapshot: InterruptionSnapshot | null;
+  };
   mockCourse: GeneratedCourse | null;
   providerPlan: ProviderPlan;
   runtimeProviders: RuntimeProviders;
@@ -62,6 +69,11 @@ type VaanikaState = {
   setLearnerNeed: (need: string) => void;
   setSelectedGoal: (goal: LearningGoal) => void;
   setSelectedLanguage: (language: LanguageCode) => void;
+  setLessonRuntime: (runtime: {
+    activePhase?: LessonPhase;
+    activeStepId?: string | null;
+    interruptionSnapshot?: InterruptionSnapshot | null;
+  }) => void;
   startLesson: () => void;
 };
 
@@ -85,6 +97,11 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
   const [authNotice, setAuthNotice] = useState<string | null>(null);
   const [learnerProfile, setLearnerProfile] = useState<LearnerProfile | null>(null);
   const [dataStatus, setDataStatus] = useState<VaanikaState['dataStatus']>('idle');
+  const [lessonRuntime, setLessonRuntimeState] = useState<VaanikaState['lessonRuntime']>({
+    activePhase: 'TEACH',
+    activeStepId: null,
+    interruptionSnapshot: null,
+  });
 
   const language = LANGUAGES.find((item) => item.code === selectedLanguage) ?? LANGUAGES[0];
   const providerPlan = useMemo(() => getProviderPlan(selectedLanguage), [selectedLanguage]);
@@ -143,6 +160,7 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
       learnerProfile,
       learnerNeed,
       lessonStatus,
+      lessonRuntime,
       mockCourse,
       providerPlan,
       runtimeProviders,
@@ -270,6 +288,16 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
         return Boolean(authState.userId);
       },
       setLearnerNeed,
+      setLessonRuntime: (runtime) => {
+        setLessonRuntimeState((current) => ({
+          activePhase: runtime.activePhase ?? current.activePhase,
+          activeStepId: runtime.activeStepId ?? current.activeStepId,
+          interruptionSnapshot:
+            runtime.interruptionSnapshot === undefined
+              ? current.interruptionSnapshot
+              : runtime.interruptionSnapshot,
+        }));
+      },
       setSelectedGoal,
       setSelectedLanguage,
       startLesson: () => setLessonStatus('in_progress'),
@@ -293,6 +321,7 @@ export function VaanikaProvider({ children }: PropsWithChildren) {
       learnerProfile,
       learnerNeed,
       lessonStatus,
+      lessonRuntime,
       mockCourse,
       providerPlan,
       runtimeProviders,

@@ -7,6 +7,11 @@ export const LANGUAGES: LearningLanguage[] = [
     focus: 'Regional Indian language validation',
   },
   {
+    code: 'te-IN',
+    name: 'Telugu',
+    focus: 'Regional Indian language conversational fluency',
+  },
+  {
     code: 'es-ES',
     name: 'Spanish',
     focus: 'Travel and everyday conversation',
@@ -56,6 +61,20 @@ export const tutorMessages: Record<LanguageCode, TutorMessage[]> = {
     {
       role: 'tutor',
       text: 'Yes. I will understand the code-mix, teach the Tamil phrase, and then help you repeat it naturally.',
+    },
+  ],
+  'te-IN': [
+    {
+      role: 'tutor',
+      text: 'Namaskaram. Today we practice simple Telugu introductions and a short daily conversation exchange.',
+    },
+    {
+      role: 'learner',
+      text: 'Can I ask in English if I do not know the Telugu word?',
+    },
+    {
+      role: 'tutor',
+      text: 'Yes. I will accept code-mix, teach the Telugu phrase, and bring you back to the active class step.',
     },
   ],
   'es-ES': [

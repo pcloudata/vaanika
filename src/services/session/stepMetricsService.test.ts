@@ -3,6 +3,7 @@ import { buildLessonStepEventInsert } from './stepMetricsService';
 describe('stepMetricsService', () => {
   it('builds a stable insert payload for step metrics', () => {
     const payload = buildLessonStepEventInsert({
+      activePhase: 'PRACTICE',
       eventType: 'practice_pass',
       learnerText: 'Vanakkam, en peyar Prashanth.',
       lessonSessionId: 'session-1',
@@ -18,6 +19,7 @@ describe('stepMetricsService', () => {
       step_id: 'intro-name',
       step_index: 0,
       tutor_text: 'Great response. Moving to next step.',
+      active_phase: 'PRACTICE',
     });
   });
 });

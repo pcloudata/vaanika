@@ -27,7 +27,7 @@ export async function speakTutorLine(text: string, languageCode: LanguageCode, p
   await stopTutorSpeech(providerName);
 
   try {
-    if (providerName === 'Sarvam' && languageCode === 'ta-IN') {
+    if (providerName === 'Sarvam' && (languageCode === 'ta-IN' || languageCode === 'te-IN')) {
       await speakWithSarvamTts(text);
       return;
     }
@@ -60,7 +60,7 @@ export async function transcribeRecordedAudio(
     throw new Error('No audio captured.');
   }
 
-  if (providerName === 'Sarvam' && languageCode === 'ta-IN') {
+  if (providerName === 'Sarvam' && (languageCode === 'ta-IN' || languageCode === 'te-IN')) {
     try {
       const sarvamTranscript = await transcribeWithSarvam(uri);
       if (sarvamTranscript) {
@@ -202,6 +202,9 @@ function toWhisperLanguage(languageCode: LanguageCode): string {
   if (languageCode === 'ta-IN') {
     return 'ta';
   }
+  if (languageCode === 'te-IN') {
+    return 'te';
+  }
 
   if (languageCode === 'es-ES') {
     return 'es';
@@ -218,6 +221,9 @@ function fallbackTranscript(languageCode: LanguageCode): string {
   if (languageCode === 'ta-IN') {
     return 'Konjam medhuva sollunga please.';
   }
+  if (languageCode === 'te-IN') {
+    return 'Konchem mellaga cheppandi please.';
+  }
 
   return 'Can you repeat that more slowly?';
 }
@@ -225,6 +231,9 @@ function fallbackTranscript(languageCode: LanguageCode): string {
 function getInterruptionPhrase(languageCode: LanguageCode): string {
   if (languageCode === 'ta-IN') {
     return 'Nalla kelvi.';
+  }
+  if (languageCode === 'te-IN') {
+    return 'Manchi prasna.';
   }
 
   if (languageCode === 'es-ES') {
@@ -241,6 +250,9 @@ function getInterruptionPhrase(languageCode: LanguageCode): string {
 function languageLabel(languageCode: LanguageCode): string {
   if (languageCode === 'ta-IN') {
     return 'Tamil';
+  }
+  if (languageCode === 'te-IN') {
+    return 'Telugu';
   }
 
   if (languageCode === 'es-ES') {
@@ -266,6 +278,13 @@ function fallbackFollowUpReply(learnerText: string, languageCode: LanguageCode):
     return 'Tamil example: "Naan innum kathukkiren" means "I am still learning." Now let us continue.';
   }
 
+  if (languageCode === 'te-IN') {
+    if (asksNameQuestion) {
+      return 'In Telugu, "What is your name?" is "Mee peru emiti?" Example: "Namaskaram, mee peru emiti?" means "Hello, what is your name?"';
+    }
+    return 'Telugu example: "Nenu inka nerchukuntunnanu" means "I am still learning." Now let us continue.';
+  }
+
   if (languageCode === 'es-ES') {
     return 'Spanish example: "Como te llamas?" means "What is your name?" Now let us continue.';
   }
@@ -286,7 +305,9 @@ function fallbackSpokenReply(displayReply: string, languageCode: LanguageCode): 
 
   return languageCode === 'ta-IN'
     ? 'Tamil phrase ready. Shall we continue?'
-    : 'Answer ready. Shall we continue?';
+    : languageCode === 'te-IN'
+      ? 'Telugu phrase ready. Shall we continue?'
+      : 'Answer ready. Shall we continue?';
 }
 
 function normalizeSpokenReply(text: string, languageCode: LanguageCode): string {
