@@ -313,7 +313,7 @@ export async function evaluatePracticeResponse(
 
   const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return fallbackEvaluation(learnerText, step);
+    return enforceRegionalEvidence(fallbackEvaluation(learnerText, step), learnerText, step, languageCode);
   }
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -343,23 +343,24 @@ export async function evaluatePracticeResponse(
   });
 
   if (!response.ok) {
-    return fallbackEvaluation(learnerText, step);
+    return enforceRegionalEvidence(fallbackEvaluation(learnerText, step), learnerText, step, languageCode);
   }
 
   const payload = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
   const raw = payload.choices?.[0]?.message?.content;
   if (!raw) {
-    return fallbackEvaluation(learnerText, step);
+    return enforceRegionalEvidence(fallbackEvaluation(learnerText, step), learnerText, step, languageCode);
   }
 
   try {
     const parsed = JSON.parse(raw) as { passed?: boolean; feedback?: string };
-    return {
+    const evaluated = {
       passed: Boolean(parsed.passed),
       feedback: parsed.feedback?.trim() || 'Good attempt. Let us continue.',
     };
+    return enforceRegionalEvidence(evaluated, learnerText, step, languageCode);
   } catch {
-    return fallbackEvaluation(learnerText, step);
+    return enforceRegionalEvidence(fallbackEvaluation(learnerText, step), learnerText, step, languageCode);
   }
 }
 
@@ -418,9 +419,13 @@ export function classifyLearnerUtterance(
 }
 
 function fallbackEvaluation(learnerText: string, step: LessonStep): PracticeEvaluation {
-  const normalized = learnerText.toLowerCase();
-  const score = step.expectedKeywords.reduce((count, keyword) => (normalized.includes(keyword.toLowerCase()) ? count + 1 : count), 0);
-  if (score >= Math.max(1, Math.ceil(step.expectedKeywords.length / 2))) {
+  const inferredLanguage = inferRegionalLanguage(step);
+  const score = countStepIntentHits(learnerText, step, inferredLanguage);
+  const minimumHits =
+    inferredLanguage === 'ta-IN' || inferredLanguage === 'te-IN'
+      ? 1
+      : Math.max(1, Math.ceil(step.expectedKeywords.length / 2));
+  if (score >= minimumHits) {
     return {
       passed: true,
       feedback: 'Nice delivery. That was understandable and natural.',
@@ -433,27 +438,10 @@ function fallbackEvaluation(learnerText: string, step: LessonStep): PracticeEval
   };
 }
 
-function matchesStepIntent(normalizedText: string, step: LessonStep, languageCode: LanguageCode): boolean {
-  const keywordHits = step.expectedKeywords.filter((keyword) =>
-    normalizedText.includes(keyword.toLowerCase()),
-  ).length;
+function matchesStepIntent(normalizedText: string, step: LessonStep, _languageCode: LanguageCode): boolean {
+  const keywordHits = countStepIntentHits(normalizedText, step, _languageCode);
   if (keywordHits >= 1) {
     return true;
-  }
-
-  if (languageCode === 'te-IN') {
-    return (
-      normalizedText.includes('పేరు') ||
-      normalizedText.includes('ఏమిటి') ||
-      normalizedText.includes('మీ పేరు') ||
-      normalizedText.includes('భోజనం') ||
-      normalizedText.includes('ముగించారా') ||
-      normalizedText.includes('నమస్కారం')
-    );
-  }
-
-  if (languageCode === 'ta-IN') {
-    return normalizedText.includes('வணக்கம்') || normalizedText.includes('சாப்பாடு') || normalizedText.includes('என்ன');
   }
 
   return false;
@@ -465,40 +453,206 @@ function evaluateWithHeuristics(
   languageCode: LanguageCode,
 ): PracticeEvaluation | null {
   const normalized = learnerText.trim().toLowerCase();
-  const keywordHits = step.expectedKeywords.filter((keyword) =>
-    normalized.includes(keyword.toLowerCase()),
-  ).length;
+  const keywordHits = countStepIntentHits(normalized, step, languageCode);
+  const minimumHits =
+    languageCode === 'ta-IN' || languageCode === 'te-IN'
+      ? 1
+      : Math.max(1, Math.ceil(step.expectedKeywords.length / 2));
   if (keywordHits >= Math.max(1, Math.ceil(step.expectedKeywords.length / 2))) {
-    return {
-      passed: true,
-      feedback: 'Strong response. Correct meaning and key phrase use. Let us continue to the next step.',
-    };
+    return enforceRegionalEvidence(
+      {
+        passed: true,
+        feedback: 'Strong response. Correct meaning and key phrase use. Let us continue to the next step.',
+      },
+      learnerText,
+      step,
+      languageCode,
+    );
   }
 
-  if (languageCode === 'ta-IN') {
-    const hasTamilGreeting =
-      normalized.includes('vanakkam') || normalized.includes('வணக்கம்') || normalized.includes('greetings') || normalized.includes('hello');
-    if (hasTamilGreeting) {
-      return {
-        passed: true,
-        feedback: 'Great meaning. Next time add more Tamil words: "Vanakkam, ungal peyar enna?"',
-      };
-    }
-  }
-
-  if (languageCode === 'te-IN') {
-    const hasTeluguIntent =
-      normalized.includes('నమస్కారం') ||
-      normalized.includes('మీ పేరు') ||
-      normalized.includes('భోజనం') ||
-      normalized.includes('ముగించారా');
-    if (hasTeluguIntent) {
-      return {
-        passed: true,
-        feedback: 'Good Telugu usage. Keep the same structure and speak at a natural pace.',
-      };
-    }
+  if (
+    keywordHits > 0 &&
+    keywordHits < minimumHits &&
+    (languageCode !== 'ta-IN' && languageCode !== 'te-IN')
+  ) {
+    return enforceRegionalEvidence(
+      {
+        passed: false,
+        feedback: 'Good meaning. Include more of the target phrase and try once more.',
+      },
+      learnerText,
+      step,
+      languageCode,
+    );
   }
 
   return null;
 }
+
+function enforceRegionalEvidence(
+  evaluation: PracticeEvaluation,
+  learnerText: string,
+  step: LessonStep,
+  languageCode: LanguageCode,
+): PracticeEvaluation {
+  if (languageCode !== 'ta-IN' && languageCode !== 'te-IN') {
+    return evaluation;
+  }
+
+  const hasEvidence = hasRegionalLanguageEvidence(learnerText, languageCode, step);
+  if (evaluation.passed && !hasEvidence) {
+    return {
+      passed: false,
+      feedback:
+        languageCode === 'te-IN'
+          ? 'Meaning is close. Please say the answer with Telugu words or script for this step.'
+          : 'Meaning is close. Please say the answer with Tamil words or script for this step.',
+    };
+  }
+
+  return evaluation;
+}
+
+function hasRegionalLanguageEvidence(
+  learnerText: string,
+  languageCode: 'ta-IN' | 'te-IN',
+  step: LessonStep,
+): boolean {
+  if (containsRegionalScript(learnerText, languageCode)) {
+    return true;
+  }
+
+  const normalized = learnerText.toLowerCase();
+  const regionalTokens = languageCode === 'te-IN' ? TELUGU_ROMANIZED_TOKENS : TAMIL_ROMANIZED_TOKENS;
+  const hasRegionalToken = regionalTokens.some((token) => normalized.includes(token));
+  if (!hasRegionalToken) {
+    return false;
+  }
+
+  return countStepIntentHits(normalized, step, languageCode) > 0;
+}
+
+function containsRegionalScript(learnerText: string, languageCode: 'ta-IN' | 'te-IN'): boolean {
+  if (languageCode === 'te-IN') {
+    return /[\u0C00-\u0C7F]/u.test(learnerText);
+  }
+  return /[\u0B80-\u0BFF]/u.test(learnerText);
+}
+
+const TELUGU_ROMANIZED_TOKENS = [
+  'namaskaram',
+  'nenu',
+  'meeru',
+  'mee',
+  'peru',
+  'emiti',
+  'ekkada',
+  'bhojanam',
+  'muginchara',
+  'dhany',
+  'cheppandi',
+  'mellaga',
+  'nundi',
+  'vastunnanu',
+  'nerchukuntunna',
+];
+
+const TAMIL_ROMANIZED_TOKENS = [
+  'vanakkam',
+  'ungal',
+  'peyar',
+  'enna',
+  'saapadu',
+  'unavu',
+  'nandri',
+  'thirumba',
+  'medhuva',
+  'enga',
+  'irukkiren',
+  'kathukkiren',
+  'naalai',
+  'serndhu',
+];
+
+function inferRegionalLanguage(step: LessonStep): LanguageCode {
+  const prompt = step.practicePrompt.native.toLowerCase();
+  if (prompt.includes('say in telugu')) {
+    return 'te-IN';
+  }
+  if (prompt.includes('say in tamil')) {
+    return 'ta-IN';
+  }
+  return 'en-US';
+}
+
+function countStepIntentHits(learnerText: string, step: LessonStep, languageCode: LanguageCode): number {
+  const normalized = learnerText.toLowerCase();
+  const anchors = new Set(step.expectedKeywords.map((keyword) => keyword.toLowerCase()));
+
+  if (languageCode === 'te-IN') {
+    for (const keyword of step.expectedKeywords) {
+      const mapped = TELUGU_INTENT_ANCHORS[keyword.toLowerCase()];
+      if (mapped) {
+        for (const entry of mapped) {
+          anchors.add(entry.toLowerCase());
+        }
+      }
+    }
+  }
+
+  if (languageCode === 'ta-IN') {
+    for (const keyword of step.expectedKeywords) {
+      const mapped = TAMIL_INTENT_ANCHORS[keyword.toLowerCase()];
+      if (mapped) {
+        for (const entry of mapped) {
+          anchors.add(entry.toLowerCase());
+        }
+      }
+    }
+  }
+
+  let hits = 0;
+  anchors.forEach((anchor) => {
+    if (anchor && normalized.includes(anchor)) {
+      hits += 1;
+    }
+  });
+  return hits;
+}
+
+const TELUGU_INTENT_ANCHORS: Record<string, string[]> = {
+  name: ['పేరు', 'mee peru'],
+  peru: ['పేరు'],
+  emiti: ['ఏమిటి', 'emiti'],
+  from: ['నుంచి', 'nundi'],
+  where: ['ఎక్కడ', 'ekkada'],
+  dinner: ['భోజనం', 'bhojanam'],
+  bhojanam: ['భోజనం'],
+  muginchara: ['ముగించారా'],
+  water: ['నీళ్లు', 'neellu'],
+  home: ['ఇల్లు', 'illu'],
+  hungry: ['ఆకలి', 'akali'],
+  tea: ['టీ', 'chai'],
+  right: ['కుడి', 'kudi'],
+  left: ['ఎడమ', 'edama'],
+  repeat: ['మళ్ళీ', 'malli'],
+  slowly: ['మెల్లగా', 'mellaga'],
+  thank: ['ధన్యవాదాలు', 'dhanyavadalu'],
+};
+
+const TAMIL_INTENT_ANCHORS: Record<string, string[]> = {
+  name: ['பெயர்', 'peyar'],
+  enna: ['என்ன', 'enna'],
+  from: ['இருந்து', 'irundhu'],
+  where: ['எங்கே', 'enge'],
+  dinner: ['சாப்பாடு', 'saapadu', 'unavu'],
+  water: ['தண்ணீர்', 'thanni'],
+  home: ['வீடு', 'veedu'],
+  hungry: ['பசிக்குது', 'pasikkuthu'],
+  tea: ['தேநீர்', 'tea'],
+  right: ['வலது', 'valathu'],
+  left: ['இடது', 'idathu'],
+  repeat: ['திரும்ப', 'thirumba'],
+  slowly: ['மெதுவா', 'medhuva'],
+  thank: ['நன்றி', 'nandri'],
+};

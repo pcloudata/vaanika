@@ -73,7 +73,7 @@ export async function transcribeRecordedAudio(
 
   const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    return fallbackTranscript(languageCode);
+    throw new Error('Transcription key not configured.');
   }
 
   const formData = new FormData();
@@ -215,17 +215,6 @@ function toWhisperLanguage(languageCode: LanguageCode): string {
   }
 
   return 'en';
-}
-
-function fallbackTranscript(languageCode: LanguageCode): string {
-  if (languageCode === 'ta-IN') {
-    return 'Konjam medhuva sollunga please.';
-  }
-  if (languageCode === 'te-IN') {
-    return 'Konchem mellaga cheppandi please.';
-  }
-
-  return 'Can you repeat that more slowly?';
 }
 
 function getInterruptionPhrase(languageCode: LanguageCode): string {

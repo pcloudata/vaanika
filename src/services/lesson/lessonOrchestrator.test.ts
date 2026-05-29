@@ -1,6 +1,7 @@
 import {
   canHandleFollowUp,
   classifyLearnerUtterance,
+  evaluatePracticeResponse,
   getLessonPlan,
   restoreFromInterruption,
   transitionAfterPracticeEvaluation,
@@ -94,7 +95,7 @@ describe('lessonOrchestrator utterance classification', () => {
   });
 
   it('treats Telugu script practice question as practice for dinner step', () => {
-    const step = getLessonPlan('te-IN').steps[1];
+    const step = getLessonPlan('te-IN', 1).steps[0];
     const classification = classifyLearnerUtterance('మీరు భోజనం ముగించారా?', step, 'te-IN');
 
     expect(classification).toBe('practice');
@@ -104,5 +105,20 @@ describe('lessonOrchestrator utterance classification', () => {
     expect(canHandleFollowUp(0, 2)).toBe(true);
     expect(canHandleFollowUp(1, 2)).toBe(true);
     expect(canHandleFollowUp(2, 2)).toBe(false);
+  });
+
+  it('fails English-only response for Telugu step even if meaning matches', async () => {
+    const step = getLessonPlan('te-IN').steps[4];
+    const result = await evaluatePracticeResponse('I am from Hyderabad.', step, 'te-IN');
+
+    expect(result.passed).toBe(false);
+    expect(result.feedback.toLowerCase()).toContain('telugu');
+  });
+
+  it('passes Telugu transliteration response for matching Telugu step', async () => {
+    const step = getLessonPlan('te-IN', 1).steps[0];
+    const result = await evaluatePracticeResponse('Meeru bhojanam muginchara?', step, 'te-IN');
+
+    expect(result.passed).toBe(true);
   });
 });
