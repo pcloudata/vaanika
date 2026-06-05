@@ -14,6 +14,7 @@
     "db:list": "supabase migration list",
     "db:verify": "node scripts/db-verify.mjs",
     "db:verify:fail": "DB_VERIFY_MODE=fail node scripts/db-verify.mjs",
+    "keepalive:test": "node scripts/keepalive-test.mjs",
     "release:preflight:web": "bash scripts/release-preflight-web.sh",
     "release:preflight:web:fail": "bash scripts/release-preflight-web-fail.sh"
   },

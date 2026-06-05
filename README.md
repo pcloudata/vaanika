@@ -139,6 +139,12 @@ EXPO_PUBLIC_SUPABASE_ANON_KEY=
 After applying migrations, test the RPC manually:
 
 ```sh
+npm run keepalive:test
+```
+
+Or call the REST endpoint directly:
+
+```sh
 curl --fail --request POST \
   --header "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY" \
   --header "Authorization: Bearer $EXPO_PUBLIC_SUPABASE_ANON_KEY" \
