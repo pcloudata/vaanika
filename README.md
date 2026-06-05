@@ -119,6 +119,34 @@ npm run release:preflight:web:fail
 
 RLS is enabled for all learner-owned tables. Learner rows are scoped to `auth.uid()`.
 
+### Free Plan Keepalive
+
+Supabase Free Plan projects can pause after low activity. Vaanika includes a small keepalive path for development/demo environments:
+
+- Migration: `supabase/migrations/20260605180000_add_keepalive_ping.sql`
+- RPC: `public.keepalive_ping(p_source text)`
+- Schedule: `.github/workflows/supabase-keepalive.yml`, every 3 days
+
+The workflow uses the public anon key to call a security-definer RPC that updates only `public.app_keepalive`. It does not read or write learner data.
+
+Required GitHub repository secrets:
+
+```sh
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_ANON_KEY=
+```
+
+After applying migrations, test the RPC manually:
+
+```sh
+curl --fail --request POST \
+  --header "apikey: $EXPO_PUBLIC_SUPABASE_ANON_KEY" \
+  --header "Authorization: Bearer $EXPO_PUBLIC_SUPABASE_ANON_KEY" \
+  --header "Content-Type: application/json" \
+  --data '{"p_source":"manual"}' \
+  "$EXPO_PUBLIC_SUPABASE_URL/rest/v1/rpc/keepalive_ping"
+```
+
 ## Commands
 
 Core quality gate:
