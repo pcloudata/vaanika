@@ -2,7 +2,7 @@ name: Supabase Keepalive
 
 on:
   schedule:
-    - cron: "0 12 */3 * *"
+    - cron: "17 12 * * *"
   workflow_dispatch:
 
 jobs:
@@ -19,10 +19,15 @@ jobs:
           test -n "$SUPABASE_URL"
           test -n "$SUPABASE_ANON_KEY"
 
-          curl --fail --silent --show-error \
+          PROJECT_REF="$(printf '%s' "$SUPABASE_URL" | sed -E 's#https://([^.]+)\.supabase\.co/?#\1#')"
+          echo "Pinging Supabase project ref: $PROJECT_REF"
+
+          RESPONSE="$(curl --fail --silent --show-error \
             --request POST \
             --header "apikey: $SUPABASE_ANON_KEY" \
             --header "Authorization: Bearer $SUPABASE_ANON_KEY" \
             --header "Content-Type: application/json" \
-            --data '{"p_source":"github-actions"}' \
-            "$SUPABASE_URL/rest/v1/rpc/keepalive_ping"
+            --data "{\"p_source\":\"github-actions:${GITHUB_RUN_ID}\"}" \
+            "$SUPABASE_URL/rest/v1/rpc/keepalive_ping")"
+
+          echo "Keepalive RPC returned: $RESPONSE"

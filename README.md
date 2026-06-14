@@ -125,9 +125,9 @@ Supabase Free Plan projects can pause after low activity. Vaanika includes a sma
 
 - Migration: `supabase/migrations/20260605180000_add_keepalive_ping.sql`
 - RPC: `public.keepalive_ping(p_source text)`
-- Schedule: `.github/workflows/supabase-keepalive.yml`, every 3 days
+- Schedule: `.github/workflows/supabase-keepalive.yml`, daily
 
-The workflow uses the public anon key to call a security-definer RPC that updates only `public.app_keepalive`. It does not read or write learner data.
+The workflow uses the public anon key to call a security-definer RPC that updates only `public.app_keepalive`. It does not read or write learner data. Workflow logs print the Supabase project ref being pinged so it can be compared with any pause-warning email.
 
 Required GitHub repository secrets:
 
